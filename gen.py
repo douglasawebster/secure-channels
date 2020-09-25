@@ -1,5 +1,4 @@
 from Crypto.PublicKey import RSA
-import json
 
 def generate_keys():
 
@@ -29,11 +28,4 @@ def generate_keys():
     f.write(bob_public_key)
     f.close()
 
-    f2 = open('./keys/alice_priv.pem','rb')
-    key = RSA.import_key(f2.read())
-    f2.close()
-
-    print(key.size_in_bits())
-
 generate_keys()
-
