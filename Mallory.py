@@ -66,11 +66,29 @@ def main():
 
     # message loop
     print("connected")
+    
+
+    
     while(True):
         msg_recieved = alice_connfd.recv(1024).decode()
         print("Received from alice: %s" % msg_recieved)
-        msg_to_send = input("Enter message for server: ")
-        bob_clientfd.send(msg_to_send.encode())
+        message_behavior = 0
+        #what are you doing w the message
+        while (message_behavior < 1) or (message_behavior > 3):
+            # TODO: error handling
+            message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob \n 2: Edit this message \n 3: Delete this message? \n"))
+            if message_behavior == 1: # send the message on w/o alteration
+                print("passing the message on")
+                bob_clientfd.send(msg_recieved.encode())
+            elif message_behavior == 2: #alter message
+                #TODO: implement alter
+                print("alter message (not implemented")
+            elif message_behavior == 3: # do not send the message
+                print("message dropped")
+            else: #bad input TODO:write better instructions
+                print("bad input")
+            
+
 
 #        # You don't need to receive for this assignment, but if you wanted to
 #        # you would use something like this

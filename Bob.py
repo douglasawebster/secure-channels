@@ -13,6 +13,11 @@ def read_keys():
     public_key = RSA.import_key(f.read())
     f.close()
 
+# detect if a message has been tampered with
+def detect_shennanigans(message):
+    False
+
+
 def main():
     
     # parse arguments
@@ -60,7 +65,10 @@ def main():
     # message loop
     while(True):
         msg = connfd.recv(1024).decode()
-        print("Received from client: %s" % msg)
+        if(detect_shennanigans(msg)):
+            print("the following message has been altered: %s" % msg)
+        else:
+            print("Received from client: %s" % msg)
 
 #        # You don't need to send a response for this assignment
 #        # but if you wanted to you'd do something like this
