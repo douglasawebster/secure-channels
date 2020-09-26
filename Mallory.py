@@ -4,7 +4,6 @@ from os import _exit as quit
 from Crypto.PublicKey import RSA
 
 def read_keys():
-    global alice_public, bob_public
     f = open('./keys/alice_public.pem', 'rb')
     alice_public = RSA.import_key(f.read())
     f.close()
@@ -12,6 +11,8 @@ def read_keys():
     f = open('./keys/bob_public.pem', 'rb')
     bob_public = RSA.import_key(f.read())
     f.close()
+
+    return (alice_public, bob_public)
 
 def main():
 
@@ -38,10 +39,6 @@ def main():
         enc = True
         mac = True
 
-    # load crypto tools if needed
-    if enc:
-        read_keys()
-
     # open a socket to listen to alice
     alice_listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     alice_listenfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -52,34 +49,45 @@ def main():
     # listen to socket
     alice_listenfd.listen(1)
     
-    print("connect to alice")
+    print("Connecting to Alice")
     # accept connection
     (alice_connfd, addr) = alice_listenfd.accept()
 
-    print("connected")
     # open a socket to broadcast to bob
     bob_clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print("connect to bob")
+    print("Connecting to Bob")
     # connect to server
     bob_clientfd.connect((host, int(bob_port)))
 
-    # message loop
-    print("connected")
-    
+    alice_public, bob_public = read_keys()
 
+    # load crypto tools if needed
+    if enc:
+        recieved_msg = alice_connfd.recv(1024)
+        bob_clientfd.send(recieved_msg)
+
+    if mac:
+        recieved_msg = alice_connfd.recv(1024)
+        bob_clientfd.send(recieved_msg)
     
+    # message loop
     while(True):
-        msg_recieved = alice_connfd.recv(1024).decode()
-        print("Received from alice: %s" % msg_recieved)
+        recieved_msg = alice_connfd.recv(1024).decode()
+
         message_behavior = 0
         #what are you doing w the message
         while (message_behavior < 1) or (message_behavior > 3):
             # TODO: error handling
+
+            print(recieved_msg)
             message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob \n 2: Edit this message \n 3: Delete this message? \n"))
+            
+
+
             if message_behavior == 1: # send the message on w/o alteration
                 print("passing the message on")
-                bob_clientfd.send(msg_recieved.encode())
+                bob_clientfd.send(recieved_msg.encode())
             elif message_behavior == 2: #alter message
                 #TODO: implement alter
                 print("alter message (not implemented")
@@ -87,6 +95,8 @@ def main():
                 print("message dropped")
             else: #bad input TODO:write better instructions
                 print("bad input")
+
+            
             
 
 
