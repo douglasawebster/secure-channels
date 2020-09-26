@@ -3,19 +3,21 @@ import socket
 from os import _exit as quit
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES
-from base64 import b64decode
+from base64 import b64decode, b64encode
 from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Hash import HMAC, SHA256
 import base64
 import json
 
+
+# verify str msg hasn't been altered using HMAC-SHA 256
+# return true if the message is unaltered
+# msg: string message to check
+# mac: mac hash to check against the message
+# key: mac secret key
 def verify_mac(msg, mac, key):
-    #secret = key.exportKey('PEM')
     h = HMAC.new(key, digestmod=SHA256)
-    print(msg)
-    print()
-    print(mac)
     h.update(msg.encode())
 
     try: 
@@ -24,22 +26,40 @@ def verify_mac(msg, mac, key):
     except:
         return False
 
-def decrypt(data, session_key):
+# decrypt an encrypted string using AES-CBC
+# returns decrypted string
+# msg: the encrypted string, beginning with the IV for AES
+# session key: the AES session key 
+def decrypt(msg, session_key):
     try:
-        b64 = json.loads(data)
-        iv = b64decode(b64['iv'])
-        ct = b64decode(b64['ciphertext'])
-        cipher = AES.new(session_key, AES.MODE_CBC, iv)
-        pt = unpad(cipher.decrypt(ct), AES.block_size)
+        print(msg)
+        # msg = msg.decode('base64','strict')
+
+        print(msg)
+        iv = msg[0:24]
+        ct = msg[24:]
+
+        print(iv)
+        print()
+        print(ct)
+
+        cipher = AES.new(session_key, AES.MODE_CBC, b64decode(iv))
+        pt = unpad(cipher.decrypt(b64decode(ct)), AES.block_size)
         return pt
     except ValueError:
         print("Incorrect decryption")
 
+# decrypt an aes session key that was encrypted with your RSA public key
+# returns byte string session_key
+# enc_session_key: string of the encrypted session key
+# private_key: your RSA private key
 def decrypt_session_key(enc_session_key, private_key):
     cipher_rsa = PKCS1_OAEP.new(private_key)
     session_key = cipher_rsa.decrypt(enc_session_key) 
     return session_key
 
+# read in your RSA keys from files
+# returns a tuple of RSA keys: (my_private, my_public, alice_public)
 def read_keys():
     f = open('./keys/bob_priv.pem', 'rb')
     bob_private_key = RSA.import_key(f.read())
@@ -54,11 +74,6 @@ def read_keys():
     f.close()
 
     return bob_private_key, bob_public_key, alice_public_key
-
-# detect if a message has been tampered with
-def detect_shennanigans(message):
-    False
-
 
 def main():
     
@@ -84,6 +99,10 @@ def main():
     elif config == "EncThenMac":
         enc = True
         mac = True
+    else:
+        print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
+        quit(1)
+
 
     # open a socket
     listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -115,22 +134,20 @@ def main():
     # message loop
     while(True):
         msg = connfd.recv(1024).decode()
-        if(detect_shennanigans(msg)):
-            print("the following message has been altered: %s" % msg)
+
+        if enc:
+            decrypted_msg = decrypt(msg, session_key)
+            print("Received from client: %s" % decrypted_msg)
+        elif mac:
+            print("Received from client: %s" % msg)
+            mac = msg[:64]
+            message = msg[64:]
+            if verify_mac(message, mac, mac_key):
+                print("Message is authentic")
+            else: 
+                print("Message has been altered")
         else:
-            if enc:
-                decrypted_msg = decrypt(msg, session_key)
-                print("Received from client: %s" % decrypted_msg)
-            else:
-                print("Received from client: %s" % msg)
-
-                mac = msg[:64]
-                message = msg[64:]
-
-                if verify_mac(message, mac, mac_key):
-                    print("Message is authentic")
-                else: 
-                    print("Message has been altered")
+            print("Received from client: %s" % msg)
 
 
 

@@ -2,7 +2,9 @@ import sys
 import socket
 from os import _exit as quit
 from Crypto.PublicKey import RSA
+from base64 import b64encode, b64decode
 
+# read in alice and bob's public keys
 def read_keys():
     f = open('./keys/alice_public.pem', 'rb')
     alice_public = RSA.import_key(f.read())
@@ -38,6 +40,10 @@ def main():
     elif config == "EncThenMac":
         enc = True
         mac = True
+    else:
+        print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
+        quit(1)
+
 
     # open a socket to listen to alice
     alice_listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -62,9 +68,9 @@ def main():
 
     alice_public, bob_public = read_keys()
 
-    # load crypto tools if needed
+    # pass on keys (pretend you can't read them i guess?)
     if enc:
-        recieved_msg = alice_connfd.recv(1024)
+        recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
 
     if mac:
@@ -73,7 +79,9 @@ def main():
     
     # message loop
     while(True):
-        recieved_msg = alice_connfd.recv(1024).decode()
+        # recieved_msg = alice_connfd.recv(1024).decode()
+        recieved_msg = alice_connfd.recv(1024)
+        #TODO determine what should be printed here in different cases
 
         message_behavior = 0
         #what are you doing w the message
@@ -83,11 +91,11 @@ def main():
             print(recieved_msg)
             message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob \n 2: Edit this message \n 3: Delete this message? \n"))
             
-
-
             if message_behavior == 1: # send the message on w/o alteration
                 print("passing the message on")
-                bob_clientfd.send(recieved_msg.encode())
+                # bob_clientfd.send(recieved_msg.encode())
+                print(recieved_msg)
+                bob_clientfd.send(recieved_msg)
             elif message_behavior == 2: #alter message
                 #TODO: implement alter
                 print("alter message (not implemented")

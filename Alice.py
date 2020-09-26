@@ -6,7 +6,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util.Padding import pad
-from base64 import b64encode
+from base64 import b64encode, b64decode
 from Crypto.Hash import HMAC, SHA256
 
 # generate an AES CBC cipher for the session
@@ -16,29 +16,36 @@ from Crypto.Hash import HMAC, SHA256
 # cipher_aes, the cipher object
 def generate_session_key(public_key):
     session_key = get_random_bytes(16)
-    print("SessionKey: ", session_key)
+    print("Session Key: ", session_key)
     cipher_rsa = PKCS1_OAEP.new(public_key)
     enc_session_key = cipher_rsa.encrypt(session_key)
-    # cipher_aes = AES.new(session_key, AES.MODE_CBC)
 
     return (session_key, enc_session_key)
 
+# generate a random 256 bit string for use as a mac key
 def generate_mac_key():
     return get_random_bytes(256)
     
-
-# encrypt a messaage with an AES CBC cipher
+# encrypt a message with an AES CBC cipher
+# takes a string msg to encode
+# and the aes session key
+# return a string beginning with the initialization vector, followed by the encrypted message
 def encrypt(msg, session_key): #, cipher_aes):
     msg = msg.encode()
     cipher_aes = AES.new(session_key, AES.MODE_CBC)
     ct_bytes = cipher_aes.encrypt(pad(msg, AES.block_size))
+    # print(ct_bytes)
     iv = b64encode(cipher_aes.iv).decode('utf-8')
     cipher_text = b64encode(ct_bytes).decode('utf-8')
-    result = json.dumps({'iv':iv, 'ciphertext':cipher_text})
+    result = iv + cipher_text
+
+    print(len(iv))
+
     print(result)
 
     return result
 
+# return the hash for string msg using the sha256 HMAC with bytes of key
 def create_mac(msg, key):
     h = HMAC.new(key, digestmod=SHA256)
     h.update(msg.encode())
@@ -71,6 +78,7 @@ def main():
     port = sys.argv[2]
     config = sys.argv[3]
  
+
     # set up encryption configuration
     if config == "noCrypto":
         enc = False
@@ -84,7 +92,9 @@ def main():
     elif config == "EncThenMac":
         enc = True
         mac = True
-
+    else:
+        print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
+        quit(1)
     # open a socket
     clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -94,19 +104,20 @@ def main():
 
     alice_private_key, alice_public_key, bob_public_key = read_keys()
 
-    # load crypto tools if needed
+    # load requested tools
     session_key = None
     enc_session_key = None
-    # cipher_aes = None
-    if enc:
-        session_key, enc_session_key = generate_session_key(bob_public_key) 
-        clientfd.send(enc_session_key)
-
     mac_key = None
     enc_mac_key = None
-    if mac:
+
+    if enc and mac:
+        # things get funky:TM:
+        print("placeholder")
+    elif enc:
+        session_key, enc_session_key = generate_session_key(bob_public_key) 
+        clientfd.send(enc_session_key)
+    elif mac:
         mac_key = generate_mac_key()
-        print(mac_key)
         clientfd.send(mac_key)
 
     ctr = 0
@@ -114,17 +125,24 @@ def main():
     while(True):
         msg = input("Enter message: ")
         # TODO: make sure we send the session key over in the first message
-        if enc:
+        # send encrypted message with mac tag
+        if enc and mac:
+            print("you can't do that yet")
+        
+        # send encrypted message with no tags
+        elif enc:
             enc_message = encrypt(msg, session_key)
             clientfd.send(enc_message.encode())
 
-        if mac: 
+        # send plaintext with mac tag (because that's sooooooo useful)
+        elif mac: 
             mac2 = create_mac(msg, mac_key)
             print(mac2)
             msg = mac2 +  msg
             clientfd.send(msg.encode('utf-8'))
-
-        if (not enc) and (not mac):
+        
+        # send message in plaintext without mac
+        else:
             clientfd.send(msg.encode())
 
 #        # You don't need to receive for this assignment, but if you wanted to
