@@ -111,8 +111,23 @@ def main():
     enc_mac_key = None
 
     if enc and mac:
-        # things get funky:TM:
-        print("placeholder")
+        session_key, enc_session_key = generate_session_key(bob_public_key)
+        # send bob session key encrypted with NONMALLEABLE RSA (i think?)
+        # (this means we don't need MAC)
+        # (need to check this assumption lmaooo)
+        clientfd.send(enc_session_key)
+       
+
+        mac_key = generate_mac_key()
+        #the mac key encrypted under AES (of the form [iv+mac key])
+        enc_mac_key = encrypt(mac_key.decode(), session_key) 
+        msg = create_mac(enc_mac_key, mac_key) + enc_mac_key
+        # mac hash
+        # 16-40: macIV
+        # 40- : encrypted mac key
+
+        clientfd.send(msg)
+
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key) 
         clientfd.send(enc_session_key)

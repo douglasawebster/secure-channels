@@ -69,13 +69,14 @@ def main():
     alice_public, bob_public = read_keys()
 
     # pass on keys (pretend you can't read them i guess?)
-    if enc:
+    if enc or mac:
         recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
 
-    if mac:
+    ''' if mac:
         recieved_msg = alice_connfd.recv(1024)
         bob_clientfd.send(recieved_msg)
+    '''
     
     # message loop
     while(True):

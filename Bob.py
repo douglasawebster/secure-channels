@@ -121,13 +121,17 @@ def main():
 
     # load crypto tools if needed
     session_key = None
-    if enc: 
+    mac_key = None
+    if enc and mac:
+        recieved_msg = connfd.recv(1024)
+        print(recieved_msg)
+
+    elif enc: 
         enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
         print("SessionKey: ", session_key)
 
-    mac_key = None
-    if mac:
+    elif mac:
         mac_key = connfd.recv(1024)
         print("MacKey: ", mac_key)
         
