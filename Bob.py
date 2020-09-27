@@ -10,46 +10,6 @@ from Crypto.Hash import HMAC, SHA256
 import base64
 import json
 
-
-# verify str msg hasn't been altered using HMAC-SHA 256
-# return true if the message is unaltered
-# msg: string message to check
-# mac: mac hash to check against the message
-# key: mac secret key
-def verify_mac(msg, mac, key):
-    h = HMAC.new(key, digestmod=SHA256)
-    h.update(msg.encode())
-
-    try: 
-        h.hexverify(mac)
-        return True
-    except:
-        return False
-
-# decrypt an encrypted string using AES-CBC
-# returns decrypted string
-# msg: the encrypted string, beginning with the IV for AES
-# session key: the AES session key 
-def decrypt(msg, session_key):
-    try:
-        iv = msg[0:24]
-        ct = msg[24:]
-
-        cipher = AES.new(session_key, AES.MODE_CBC, b64decode(iv))
-        pt = unpad(cipher.decrypt(b64decode(ct)), AES.block_size)
-        return pt
-    except ValueError:
-        return
-
-# decrypt an aes session key that was encrypted with your RSA public key
-# returns byte string session_key
-# enc_session_key: string of the encrypted session key
-# private_key: your RSA private key
-def decrypt_session_key(enc_session_key, private_key):
-    cipher_rsa = PKCS1_OAEP.new(private_key)
-    session_key = cipher_rsa.decrypt(enc_session_key) 
-    return session_key
-
 # read in your RSA keys from files
 # returns a tuple of RSA keys: (my_private, my_public, alice_public)
 def read_keys():
@@ -66,6 +26,45 @@ def read_keys():
     f.close()
 
     return bob_private_key, bob_public_key, alice_public_key
+
+# verify str msg hasn't been altered using HMAC-SHA 256
+# return true if the message is unaltered
+# msg: string message to check
+# mac: mac hash to check against the message
+# key: mac secret key
+def verify_mac(msg, mac, key):
+    h = HMAC.new(key, digestmod=SHA256)
+    h.update(msg.encode())
+
+    try: 
+        h.hexverify(mac)
+        return True
+    except:
+        return False
+
+# decrypt an aes session key that was encrypted with your RSA public key
+# returns byte string session_key
+# enc_session_key: string of the encrypted session key
+# private_key: your RSA private key
+def decrypt_session_key(enc_session_key, private_key):
+    cipher_rsa = PKCS1_OAEP.new(private_key)
+    session_key = cipher_rsa.decrypt(enc_session_key) 
+    return session_key
+
+# decrypt an encrypted string using AES-CBC
+# returns decrypted string
+# msg: the encrypted string, beginning with the IV for AES
+# session key: the AES session key 
+def decrypt(msg, session_key):
+    try:
+        iv = msg[0:24]
+        ct = msg[24:]
+
+        cipher = AES.new(session_key, AES.MODE_CBC, b64decode(iv))
+        pt = unpad(cipher.decrypt(b64decode(ct)), AES.block_size)
+        return pt
+    except ValueError:
+        return
 
 def main():
     
@@ -95,6 +94,7 @@ def main():
         print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
         quit(1)
 
+    expected_message_num = 0
 
     # open a socket
     listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -118,13 +118,12 @@ def main():
         enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
 
-
         recieved_msg = connfd.recv(1024).decode()
         tag = recieved_msg[:64]
         encrypted_mac_key = recieved_msg[64:]
         mac_key = decrypt(encrypted_mac_key, session_key)
 
-        print("SessionKey: ", session_key)
+        print("Session Key: ", session_key)
         print()
         print("Encrypted Session Key: ", enc_session_key)
         print()
@@ -137,7 +136,7 @@ def main():
     elif enc: 
         enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
-        print("SessionKey: ", session_key)
+        print("Session Key: ", session_key)
 
     elif mac:
         mac_key = connfd.recv(1024)
@@ -148,8 +147,10 @@ def main():
         msg = connfd.recv(1024).decode()
 
         if enc and mac:
-            tag = msg[:64]
-            encrypted_message = msg[64:]
+            message_num = int.from_bytes(msg[:4].encode(), "big")
+            print("Message number:", )
+            tag = msg[4:68]
+            encrypted_message = msg[68:]
 
             print()
             if verify_mac(encrypted_message, tag, mac_key):
@@ -159,15 +160,22 @@ def main():
 
             decrypted_msg = decrypt(encrypted_message, session_key)
 
+            print("Message Number: ", message_num)
             print("Encrypted Message: ", encrypted_message)
             print("Plain Message: ", decrypted_msg)
             print("Tag: ", tag)
             print()
 
+            if message_num != expected_message_num:
+                print("Messages dont line up. Bye.")
+                exit(1)
+        
+            expected_message_num += 1
 
         elif enc:
             decrypted_msg = decrypt(msg, session_key)
             print("Received from client: %s" % decrypted_msg)
+
         elif mac:
             print("Received from client: %s" % msg)
             mac = msg[:64]
@@ -176,19 +184,9 @@ def main():
                 print("Message is authentic")
             else: 
                 print("Message has been altered")
+
         else:
             print("Received from client: %s" % msg)
-
-
-
-        
-
-
-
-#        # You don't need to send a response for this assignment
-#        # but if you wanted to you'd do something like this
-#        msg = input("Enter message for client: ")
-#        connfd.send(msg.encode())
 
     # close connection
     connfd.close()

@@ -136,8 +136,8 @@ def main():
             cipher = recieved_msg
             print('ciphertext: ' + message + "\n")
         elif mac:
-            message = recieved_msg[64:]
             tag = recieved_msg[:64]
+            message = recieved_msg[64:]
             print('message: '+ message + '\ntag: '+ tag + "\n")
         else:
             print('message: ' + recieved_msg + "\n")
