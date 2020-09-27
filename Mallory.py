@@ -73,6 +73,9 @@ def main():
         recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
 
+        recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
+        bob_clientfd.send(recieved_msg)
+
     ''' if mac:
         recieved_msg = alice_connfd.recv(1024)
         bob_clientfd.send(recieved_msg)

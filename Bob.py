@@ -32,10 +32,6 @@ def verify_mac(msg, mac, key):
 # session key: the AES session key 
 def decrypt(msg, session_key):
     try:
-        print(msg)
-        # msg = msg.decode('base64','strict')
-
-        print(msg)
         iv = msg[0:24]
         ct = msg[24:]
 
@@ -123,8 +119,17 @@ def main():
     session_key = None
     mac_key = None
     if enc and mac:
-        recieved_msg = connfd.recv(1024)
-        print(recieved_msg)
+        enc_session_key = connfd.recv(1024)
+        session_key = decrypt_session_key(enc_session_key, bob_private_key)
+        print("SessionKey: ", session_key)
+
+
+        recieved_msg = connfd.recv(1024).decode()
+        mac = recieved_msg[:64]
+        rest = recieved_msg[64:]
+        mac_key = decrypt(rest, session_key)
+
+        print(mac_key)
 
     elif enc: 
         enc_session_key = connfd.recv(1024)
@@ -139,7 +144,20 @@ def main():
     while(True):
         msg = connfd.recv(1024).decode()
 
-        if enc:
+        if enc and mac:
+            mac = msg[:64]
+            rest = msg[64:]
+
+            if verify_mac(rest, mac, mac_key):
+                print("Message is authentic")
+            else:
+                print("Message has been altered")
+
+            decrypted_msg = decrypt(rest, session_key)
+            print("Received from client: %s" % decrypted_msg)
+
+
+        elif enc:
             decrypted_msg = decrypt(msg, session_key)
             print("Received from client: %s" % decrypted_msg)
         elif mac:

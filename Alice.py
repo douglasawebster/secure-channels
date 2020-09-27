@@ -31,17 +31,15 @@ def generate_mac_key():
 # and the aes session key
 # return a string beginning with the initialization vector, followed by the encrypted message
 def encrypt(msg, session_key): #, cipher_aes):
-    msg = msg.encode()
     cipher_aes = AES.new(session_key, AES.MODE_CBC)
     ct_bytes = cipher_aes.encrypt(pad(msg, AES.block_size))
-    # print(ct_bytes)
     iv = b64encode(cipher_aes.iv).decode('utf-8')
     cipher_text = b64encode(ct_bytes).decode('utf-8')
     result = iv + cipher_text
 
-    print(len(iv))
-
-    print(result)
+    print("IV: ", iv)
+    print()
+    print("Cipher: ", cipher_text)
 
     return result
 
@@ -115,18 +113,18 @@ def main():
         # send bob session key encrypted with NONMALLEABLE RSA (i think?)
         # (this means we don't need MAC)
         # (need to check this assumption lmaooo)
-        clientfd.send(enc_session_key)
-       
+        clientfd.send(enc_session_key)       
 
         mac_key = generate_mac_key()
         #the mac key encrypted under AES (of the form [iv+mac key])
-        enc_mac_key = encrypt(mac_key.decode(), session_key) 
-        msg = create_mac(enc_mac_key, mac_key) + enc_mac_key
+        enc_mac_key = encrypt(mac_key, session_key) 
+        mac2 = create_mac(enc_mac_key, mac_key)
+        msg = mac2 + enc_mac_key
         # mac hash
         # 16-40: macIV
         # 40- : encrypted mac key
-
-        clientfd.send(msg)
+        print(mac_key)
+        clientfd.send(msg.encode())
 
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key) 
@@ -142,11 +140,16 @@ def main():
         # TODO: make sure we send the session key over in the first message
         # send encrypted message with mac tag
         if enc and mac:
-            print("you can't do that yet")
+            enc_message = encrypt(msg.encode(), session_key)
+            mac2 = create_mac(enc_message, mac_key)
+            print(mac2)
+
+            msg = mac2 + enc_message
+            clientfd.send(msg.encode())
         
         # send encrypted message with no tags
         elif enc:
-            enc_message = encrypt(msg, session_key)
+            enc_message = encrypt(msg.encode(), session_key)
             clientfd.send(enc_message.encode())
 
         # send plaintext with mac tag (because that's sooooooo useful)
