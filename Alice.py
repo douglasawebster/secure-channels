@@ -16,7 +16,6 @@ from Crypto.Hash import HMAC, SHA256
 # cipher_aes, the cipher object
 def generate_session_key(public_key):
     session_key = get_random_bytes(16)
-    print("Session Key: ", session_key)
     cipher_rsa = PKCS1_OAEP.new(public_key)
     enc_session_key = cipher_rsa.encrypt(session_key)
 
@@ -36,10 +35,6 @@ def encrypt(msg, session_key): #, cipher_aes):
     iv = b64encode(cipher_aes.iv).decode('utf-8')
     cipher_text = b64encode(ct_bytes).decode('utf-8')
     result = iv + cipher_text
-
-    print("IV: ", iv)
-    print()
-    print("Cipher: ", cipher_text)
 
     return result
 
@@ -93,6 +88,7 @@ def main():
     else:
         print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
         quit(1)
+
     # open a socket
     clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -118,12 +114,22 @@ def main():
         mac_key = generate_mac_key()
         #the mac key encrypted under AES (of the form [iv+mac key])
         enc_mac_key = encrypt(mac_key, session_key) 
-        mac2 = create_mac(enc_mac_key, mac_key)
-        msg = mac2 + enc_mac_key
+        tag = create_mac(enc_mac_key, mac_key)
+        msg = tag + enc_mac_key
         # mac hash
         # 16-40: macIV
         # 40- : encrypted mac key
-        print(mac_key)
+
+        print("Session Key: ", session_key)
+        print()
+        print("Encrypted Session Key: ", enc_session_key)
+        print()
+        print("Mac Key: ", mac_key)
+        print()
+        print("Encrypted Mac Key: ", enc_mac_key)
+        print()
+        print("Tag: ", tag)
+
         clientfd.send(msg.encode())
 
     elif enc:
@@ -141,10 +147,15 @@ def main():
         # send encrypted message with mac tag
         if enc and mac:
             enc_message = encrypt(msg.encode(), session_key)
-            mac2 = create_mac(enc_message, mac_key)
-            print(mac2)
+            tag = create_mac(enc_message, mac_key)
+            
+            print()
+            print("Plain Message: ", msg)
+            print("Encrypted Message: ", enc_message)
+            print("Tag: ", tag)
+            print()
 
-            msg = mac2 + enc_message
+            msg = tag + enc_message
             clientfd.send(msg.encode())
         
         # send encrypted message with no tags
@@ -154,9 +165,9 @@ def main():
 
         # send plaintext with mac tag (because that's sooooooo useful)
         elif mac: 
-            mac2 = create_mac(msg, mac_key)
-            print(mac2)
-            msg = mac2 +  msg
+            tag = create_mac(msg, mac_key)
+            print(tag)
+            msg = tag +  msg
             clientfd.send(msg.encode('utf-8'))
         
         # send message in plaintext without mac

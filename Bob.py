@@ -35,15 +35,11 @@ def decrypt(msg, session_key):
         iv = msg[0:24]
         ct = msg[24:]
 
-        print(iv)
-        print()
-        print(ct)
-
         cipher = AES.new(session_key, AES.MODE_CBC, b64decode(iv))
         pt = unpad(cipher.decrypt(b64decode(ct)), AES.block_size)
         return pt
     except ValueError:
-        print("Incorrect decryption")
+        return
 
 # decrypt an aes session key that was encrypted with your RSA public key
 # returns byte string session_key
@@ -121,15 +117,22 @@ def main():
     if enc and mac:
         enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
-        print("SessionKey: ", session_key)
 
 
         recieved_msg = connfd.recv(1024).decode()
-        mac = recieved_msg[:64]
-        rest = recieved_msg[64:]
-        mac_key = decrypt(rest, session_key)
+        tag = recieved_msg[:64]
+        encrypted_mac_key = recieved_msg[64:]
+        mac_key = decrypt(encrypted_mac_key, session_key)
 
-        print(mac_key)
+        print("SessionKey: ", session_key)
+        print()
+        print("Encrypted Session Key: ", enc_session_key)
+        print()
+        print("Mac Key: ", mac_key)
+        print()
+        print("Encrypted Mac Key: ", encrypted_mac_key)
+        print()
+        print("Tag: ", tag)
 
     elif enc: 
         enc_session_key = connfd.recv(1024)
@@ -145,16 +148,21 @@ def main():
         msg = connfd.recv(1024).decode()
 
         if enc and mac:
-            mac = msg[:64]
-            rest = msg[64:]
+            tag = msg[:64]
+            encrypted_message = msg[64:]
 
-            if verify_mac(rest, mac, mac_key):
+            print()
+            if verify_mac(encrypted_message, tag, mac_key):
                 print("Message is authentic")
             else:
                 print("Message has been altered")
 
-            decrypted_msg = decrypt(rest, session_key)
-            print("Received from client: %s" % decrypted_msg)
+            decrypted_msg = decrypt(encrypted_message, session_key)
+
+            print("Encrypted Message: ", encrypted_message)
+            print("Plain Message: ", decrypted_msg)
+            print("Tag: ", tag)
+            print()
 
 
         elif enc:
