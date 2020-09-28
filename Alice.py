@@ -9,8 +9,7 @@ from Crypto.Util.Padding import pad
 from base64 import b64encode, b64decode
 from Crypto.Hash import HMAC, SHA256
 
-# reads in alice's private key and bob's public key
-# in preperation for encryption 
+# Reads in alice's private key and bob's public key
 def read_keys():
     f = open("./keys/alice_priv.pem", 'rb')
     alice_private_key = RSA.import_key(f.read())
@@ -26,9 +25,9 @@ def read_keys():
 
     return (alice_private_key, alice_public_key, bob_public_key)
 
-# generate an AES CBC cipher for the session
-# takes a RSA key
-# return a tuple containing
+# Generate an AES CBC cipher for the session
+# Takes a RSA key
+# Return a tuple containing
 # enc_session_key, the AES key encrypted by the RSA key
 # cipher_aes, the cipher object
 def generate_session_key(public_key):
@@ -38,20 +37,19 @@ def generate_session_key(public_key):
 
     return (session_key, enc_session_key)
 
-# generate a random 256 bit string for use as a mac key
+# Generate a random 256 bit string for use as a mac key
 def generate_mac_key():
     return get_random_bytes(256)
 
-# return the hash for string msg using the sha256 HMAC with bytes of key
-def create_mac(msg, key):
+# Return the hash for string msg using the sha256 HMAC with bytes of key
+def generate_mac(msg, key):
     h = HMAC.new(key, digestmod=SHA256)
     h.update(msg.encode())
     return h.hexdigest()
     
-# encrypt a message with an AES CBC cipher
-# takes a string msg to encode
-# and the aes session key
-# return a string beginning with the initialization vector, followed by the encrypted message
+# Encrypt a message with an AES CBC cipher
+# Takes a string msg to encode and the aes session key
+# Return a string beginning with the initialization vector, followed by the encrypted message
 def encrypt(msg, session_key): #, cipher_aes):
     cipher_aes = AES.new(session_key, AES.MODE_CBC)
     ct_bytes = cipher_aes.encrypt(pad(msg, AES.block_size))
@@ -63,7 +61,7 @@ def encrypt(msg, session_key): #, cipher_aes):
 
 def main():
 
-    # parse arguments
+    # Parse arguments
     if len(sys.argv) != 4:
         print("usage: python3 %s <host> <port> <config> % sys.argv[0]")
         quit(1)
@@ -71,7 +69,7 @@ def main():
     port = sys.argv[2]
     config = sys.argv[3]
  
-    # set up encryption configuration
+    # Set up encryption configuration
     if config == "noCrypto":
         enc = False
         mac = False
@@ -90,16 +88,17 @@ def main():
 
     message_number = 0
 
-    # open a socket
+    # Open a socket
     clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print("Connecting to server")
-    # connect to server
+    # Connect to server
     clientfd.connect((host, int(port)))
+    print("Connected to server")
+
 
     alice_private_key, alice_public_key, bob_public_key = read_keys()
 
-    # load requested tools
+    # Load requested tools
     session_key = None
     enc_session_key = None
     mac_key = None
@@ -115,7 +114,7 @@ def main():
         mac_key = generate_mac_key()
         #the mac key encrypted under AES (of the form [iv+mac key])
         enc_mac_key = encrypt(mac_key, session_key) 
-        tag = create_mac(enc_mac_key, mac_key)
+        tag = generate_mac(enc_mac_key, mac_key)
         msg = tag + enc_mac_key
         # mac hash
         # 16-40: macIV
@@ -144,15 +143,15 @@ def main():
 
         clientfd.send(mac_key)
 
-    # message loop
+    # Message loop
     while(True):
         msg = input("Enter message: ")
         print()
         # TODO: make sure we send the session key over in the first message
-        # send encrypted message with mac tag
+        # Send encrypted message with mac tag
         if enc and mac:
             enc_message = encrypt(msg.encode(), session_key)
-            tag = create_mac(enc_message, mac_key)
+            tag = generate_mac(enc_message, mac_key)
 
             msg = tag + enc_message
             clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
@@ -163,7 +162,7 @@ def main():
             print("Encrypted Message: ", enc_message)
             print("Tag: ", tag, "\n")
         
-        # send encrypted message with no tags
+        # Send encrypted message with no tags
         elif enc:
             enc_message = encrypt(msg.encode(), session_key)
             clientfd.send((message_number).to_bytes(4, byteorder='big') + enc_message.encode())
@@ -173,9 +172,9 @@ def main():
             print("Plain Message: ", msg)
             print("Encrypted Message: ", enc_message, "\n")
 
-        # send plaintext with mac tag (because that's sooooooo useful)
+        # Send plaintext with mac tag
         elif mac: 
-            tag = create_mac(msg, mac_key)
+            tag = generate_mac(msg, mac_key)
             msg = tag +  msg
             clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
             
@@ -185,7 +184,7 @@ def main():
             
             message_number += 1
         
-        # send message in plaintext without mac
+        # Send message in plaintext
         else:
             clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
             
@@ -194,7 +193,7 @@ def main():
             
             message_number += 1
 
-    # close connection
+    # Close connection
     clientfd.close()
 
 if __name__ == "__main__":

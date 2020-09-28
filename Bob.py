@@ -10,25 +10,24 @@ from Crypto.Hash import HMAC, SHA256
 import base64
 import json
 
-# read in your RSA keys from files
-# returns a tuple of RSA keys: (my_private, my_public, alice_public)
+# Reads in bob's private key and alices's public key
 def read_keys():
-    f = open('./keys/bob_priv.pem', 'rb')
+    f = open("./keys/bob_priv.pem", 'rb')
     bob_private_key = RSA.import_key(f.read())
     f.close()
 
-    f = open('./keys/bob_public.pem', 'rb')
+    f = open("./keys/bob_public.pem", 'rb')
     bob_public_key = RSA.import_key(f.read())
     f.close()
 
-    f = open('./keys/alice_public.pem', 'rb')
+    f = open("./keys/alice_public.pem", 'rb')
     alice_public_key = RSA.import_key(f.read())
     f.close()
 
     return bob_private_key, bob_public_key, alice_public_key
 
-# verify str msg hasn't been altered using HMAC-SHA 256
-# return true if the message is unaltered
+# Verify that a message hasn't been altered using HMAC-SHA 256
+# Return true if the message is unaltered
 # msg: string message to check
 # mac: mac hash to check against the message
 # key: mac secret key
@@ -47,8 +46,8 @@ def verify_message_num(message_num, expected_message_num):
         print("Messages Numbers Don't Line Up, Exiting!")
         exit(1)
         
-# decrypt an aes session key that was encrypted with your RSA public key
-# returns byte string session_key
+# Decrypt an aes session key that was encrypted with your RSA public key
+# Returns byte string session_key
 # enc_session_key: string of the encrypted session key
 # private_key: your RSA private key
 def decrypt_session_key(enc_session_key, private_key):
@@ -56,8 +55,8 @@ def decrypt_session_key(enc_session_key, private_key):
     session_key = cipher_rsa.decrypt(enc_session_key) 
     return session_key
 
-# decrypt an encrypted string using AES-CBC
-# returns decrypted string
+# Decrypt an encrypted string using AES-CBC
+# Returns decrypted string
 # msg: the encrypted string, beginning with the IV for AES
 # session key: the AES session key 
 def decrypt(msg, session_key):
@@ -73,16 +72,16 @@ def decrypt(msg, session_key):
 
 def main():
     
-    # parse arguments
+    # Parse arguments
     if len(sys.argv) != 3:
         print("usage: python3 %s <port> <config>" % sys.argv[0])
         quit(1)
 
-    # setting the port
+    # Setting the port
     port = sys.argv[1]
     config = sys.argv[2]
 
-    # set up encryption cnfiguration
+    # Set up encryption cnfiguration
     if config == "noCrypto":
         enc = False
         mac = False
@@ -101,22 +100,22 @@ def main():
 
     expected_message_num = 0
 
-    # open a socket
+    # Open a socket
     listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     listenfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 
-    # bind socket to ip and port
+    # Bind socket to ip and port
     listenfd.bind(('', int(port)))
 
-    # listen to socket
+    # Listen to socket
     listenfd.listen(1)
 
-    # accept connection
+    # Accept connection
     (connfd, addr) = listenfd.accept()
 
     bob_private_key, bob_public_key, alice_public_key  = read_keys()
 
-    # load crypto tools if needed
+    # Load crypto tools if needed
     session_key = None
     mac_key = None
     if enc and mac:
@@ -144,7 +143,7 @@ def main():
         mac_key = connfd.recv(1024)
         print("Mac Key: ", mac_key, "\n")
         
-    # message loop
+    # Message loop
     while(True):
         recieved_msg = connfd.recv(1024).decode()
 
@@ -207,7 +206,7 @@ def main():
             print("Plain Message: ", message, "\n")
 
 
-    # close connection
+    # Close connection
     connfd.close()
     listenfd.close()
 
