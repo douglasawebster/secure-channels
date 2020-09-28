@@ -109,7 +109,7 @@ def main():
         session_key, enc_session_key = generate_session_key(bob_public_key)
         # send bob session key encrypted with NONMALLEABLE RSA (i think?)
         # (this means we don't need MAC)
-        # (need to check this assumption lmaooo)
+        # (need to check this assumption lmaooo)        
         clientfd.send(enc_session_key)    
 
         mac_key = generate_mac_key()
@@ -121,28 +121,33 @@ def main():
         # 16-40: macIV
         # 40- : encrypted mac key
 
-        print("Session Key: ", session_key)
-        print()
-        print("Encrypted Session Key: ", enc_session_key)
-        print()
-        print("Mac Key: ", mac_key)
-        print()
-        print("Encrypted Mac Key: ", enc_mac_key)
-        print()
-        print("Tag: ", tag)
+        print("Session Key: ", session_key, "\n")
+        print("Encrypted Session Key: ", enc_session_key, "\n")
+        print("Mac Key: ", mac_key, "\n")
+        print("Encrypted Mac Key: ", enc_mac_key, "\n")
+        print("Tag: ", tag, "\n")
 
         clientfd.send(msg.encode())
 
     elif enc:
-        session_key, enc_session_key = generate_session_key(bob_public_key) 
+        session_key, enc_session_key = generate_session_key(bob_public_key)
+        
+        print("Session Key: ", session_key, "\n")
+        print("Encrypted Session Key: ", enc_session_key, "\n")
+        
         clientfd.send(enc_session_key)
+        
     elif mac:
         mac_key = generate_mac_key()
+        
+        print("Mac Key: ", mac_key, "\n")
+
         clientfd.send(mac_key)
 
     # message loop
     while(True):
         msg = input("Enter message: ")
+        print()
         # TODO: make sure we send the session key over in the first message
         # send encrypted message with mac tag
         if enc and mac:
@@ -153,35 +158,41 @@ def main():
             clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
             message_number += 1
 
-            print()
+            print("Message Number: ", message_number)
             print("Plain Message: ", msg)
             print("Encrypted Message: ", enc_message)
-            print("Tag: ", tag)
-            print()
+            print("Tag: ", tag, "\n")
         
         # send encrypted message with no tags
         elif enc:
             enc_message = encrypt(msg.encode(), session_key)
-            clientfd.send(enc_message.encode())
+            clientfd.send((message_number).to_bytes(4, byteorder='big') + enc_message.encode())
             message_number += 1
+            
+            print("Message Number: ", message_number)
+            print("Plain Message: ", msg)
+            print("Encrypted Message: ", enc_message, "\n")
 
         # send plaintext with mac tag (because that's sooooooo useful)
         elif mac: 
             tag = create_mac(msg, mac_key)
-            print(tag)
             msg = tag +  msg
-            clientfd.send(msg.encode('utf-8'))
+            clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
+            
+            print("Message Number: ", message_number)
+            print("Plain Message: ", msg)
+            print("Tag: ", tag, "\n")
+            
             message_number += 1
         
         # send message in plaintext without mac
         else:
-            clientfd.send(msg.encode())
+            clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
+            
+            print("Message Number: ", message_number)
+            print("Plain Message: ", msg, "\n")
+            
             message_number += 1
-
-#        # You don't need to receive for this assignment, but if you wanted to
-#        # you would use something like this
-#        msg = clientfd.recv(1024).decode()
-#        print("Received from server: %s" % msg)
 
     # close connection
     clientfd.close()

@@ -32,7 +32,7 @@ def read_keys():
 # msg: string message to check
 # mac: mac hash to check against the message
 # key: mac secret key
-def verify_mac(msg, mac, key):
+def verify_message(msg, mac, key):
     h = HMAC.new(key, digestmod=SHA256)
     h.update(msg.encode())
 
@@ -42,6 +42,11 @@ def verify_mac(msg, mac, key):
     except:
         return False
 
+def verify_message_num(message_num, expected_message_num):
+    if message_num != expected_message_num:
+        print("Messages Numbers Don't Line Up, Exiting!")
+        exit(1)
+        
 # decrypt an aes session key that was encrypted with your RSA public key
 # returns byte string session_key
 # enc_session_key: string of the encrypted session key
@@ -123,70 +128,84 @@ def main():
         encrypted_mac_key = recieved_msg[64:]
         mac_key = decrypt(encrypted_mac_key, session_key)
 
-        print("Session Key: ", session_key)
-        print()
-        print("Encrypted Session Key: ", enc_session_key)
-        print()
-        print("Mac Key: ", mac_key)
-        print()
-        print("Encrypted Mac Key: ", encrypted_mac_key)
-        print()
-        print("Tag: ", tag)
+        print("Session Key: ", session_key, "\n")
+        print("Encrypted Session Key: ", enc_session_key, "\n")
+        print("Mac Key: ", mac_key, "\n")
+        print("Encrypted Mac Key: ", encrypted_mac_key, "\n")
+        print("Tag: ", tag, "\n")
 
     elif enc: 
         enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
-        print("Session Key: ", session_key)
+        print("Session Key: ", session_key, "\n")
+        print("Encrypted Session Key: ", enc_session_key, "\n")
 
     elif mac:
         mac_key = connfd.recv(1024)
-        print("MacKey: ", mac_key)
+        print("Mac Key: ", mac_key, "\n")
         
     # message loop
     while(True):
-        msg = connfd.recv(1024).decode()
+        recieved_msg = connfd.recv(1024).decode()
 
         if enc and mac:
-            message_num = int.from_bytes(msg[:4].encode(), "big")
-            print("Message number:", )
-            tag = msg[4:68]
-            encrypted_message = msg[68:]
+            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
+            tag = recieved_msg[4:68]
+            encrypted_message = recieved_msg[68:]
 
-            print()
-            if verify_mac(encrypted_message, tag, mac_key):
-                print("Message is authentic")
+            if verify_message(encrypted_message, tag, mac_key):
+                print("Message Is Authentic")
             else:
-                print("Message has been altered")
+                print("Message Has Been Altered")
 
             decrypted_msg = decrypt(encrypted_message, session_key)
-
-            print("Message Number: ", message_num)
-            print("Encrypted Message: ", encrypted_message)
-            print("Plain Message: ", decrypted_msg)
-            print("Tag: ", tag)
-            print()
-
-            if message_num != expected_message_num:
-                print("Messages dont line up. Bye.")
-                exit(1)
-        
+            verify_message_num(message_number, expected_message_num)
             expected_message_num += 1
 
+            print("Message Number: ", message_number)
+            print("Encrypted Message: ", encrypted_message)
+            print("Tag: ", tag)
+            print("Plain Message: ", decrypted_msg, "\n")
+
         elif enc:
-            decrypted_msg = decrypt(msg, session_key)
-            print("Received from client: %s" % decrypted_msg)
+            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
+            encrypted_message = recieved_msg[4:]
+
+            decrypted_msg = decrypt(encrypted_message, session_key)
+            verify_message_num(message_number, expected_message_num)
+            expected_message_num += 1
+            
+            print("Message Number: ", message_number)
+            print("Encrypted Message: ", encrypted_message)
+            print("Plain Message: ", decrypted_msg, "\n")
 
         elif mac:
-            print("Received from client: %s" % msg)
-            mac = msg[:64]
-            message = msg[64:]
-            if verify_mac(message, mac, mac_key):
-                print("Message is authentic")
+            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
+            tag = recieved_msg[4:68]
+            message = recieved_msg[68:]
+            
+            if verify_message(message, tag, mac_key):
+                print("\nMessage is authentic")
             else: 
-                print("Message has been altered")
+                print("\nMessage has been altered")
+            
+            verify_message_num(message_number, expected_message_num)
+            expected_message_num += 1
+
+            print("Message Number: ", message_number)
+            print("Tag: ", tag)
+            print("Plain Message: ", message, "\n")
 
         else:
-            print("Received from client: %s" % msg)
+            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
+            message = recieved_msg[4:]
+            
+            verify_message_num(message_number, expected_message_num)
+            expected_message_num += 1
+            
+            print("Message Number: ", message_number)
+            print("Plain Message: ", message, "\n")
+
 
     # close connection
     connfd.close()

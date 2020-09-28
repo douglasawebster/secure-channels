@@ -6,16 +6,15 @@ from base64 import b64encode, b64decode
 
 # read in alice and bob's public keys
 def read_keys():
-    f = open('./keys/alice_public.pem', 'rb')
+    f = open("./keys/alice_public.pem", 'rb')
     alice_public = RSA.import_key(f.read())
     f.close()
 
-    f = open('./keys/bob_public.pem', 'rb')
+    f = open("./keys/bob_public.pem", 'rb')
     bob_public = RSA.import_key(f.read())
     f.close()
 
     return (alice_public, bob_public)
-
 
 # prompts user to alter messages and pass them on to their destination
 # destination: the socket (fd) you want to send to
@@ -24,7 +23,7 @@ def read_keys():
 # enc: is the message encrypted?
 # mac: does the message have a mac tag?
 # sends the altered message to destination
-def alter_message(destination, msg, tag, enc, mac):
+def alter_message(msg, tag, enc, mac):
     valid_behavior = False
     while not valid_behavior:
         valid_behavior = True
@@ -51,9 +50,9 @@ def alter_message(destination, msg, tag, enc, mac):
             else:
                 print("please input 'y' to alter the mac tag or 'n' to send the original tag")
                 valid_behavior = False
-        destination.send((tag+msg).encode())
+        return (tag+msg).encode()
     else:
-        destination.send(msg.encode())
+        return msg.encode()
 
 
 def main():
@@ -95,65 +94,96 @@ def main():
     # listen to socket
     alice_listenfd.listen(1)
     
-    print("Connecting to Alice")
     # accept connection
     (alice_connfd, addr) = alice_listenfd.accept()
+    print("Connected to Alice")
+
 
     # open a socket to broadcast to bob
     bob_clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print("Connecting to Bob")
     # connect to server
     bob_clientfd.connect((host, int(bob_port)))
+    print("Connected to Bob \n")
+
 
     alice_public, bob_public = read_keys()
 
     # pass on keys (pretend you can't read them i guess?)
-    if enc or mac:
+    if enc and mac:
         recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
 
         recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
-
-    ''' if mac:
-        recieved_msg = alice_connfd.recv(1024)
+        
+    elif enc:
+        recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
         bob_clientfd.send(recieved_msg)
-    '''
+    
+    elif mac:
+        recieved_msg = alice_connfd.recv(1024) #probably need to do something here later
+        bob_clientfd.send(recieved_msg)
     
     # message loop
     while(True):
-        # recieved_msg = alice_connfd.recv(1024).decode()
         recieved_msg = alice_connfd.recv(1024).decode()
-        #TODO determine what should be printed here in different cases
+        
+        # TODO determine what should be printed here in different cases
+        message_number = None
         message = None
         tag = None
+        
         if enc and mac:
-            tag = recieved_msg[:64]
-            message = recieved_msg[64:]
-            print('ciphertext: ' + message + '\ntag: '+ tag + "\n") 
+            message_number = recieved_msg[:4]
+            tag = recieved_msg[4:68]
+            message = recieved_msg[68:]
+            
+            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
+            print("Encrypted Message: " + message)
+            print("Tag: " + tag + "\n")
+            
         elif enc:
-            cipher = recieved_msg
-            print('ciphertext: ' + message + "\n")
+            message_number = recieved_msg[:4]
+            message = recieved_msg[4:]
+            
+            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
+            print("Encrypted Message: " + message + "\n")
+            
         elif mac:
-            tag = recieved_msg[:64]
-            message = recieved_msg[64:]
-            print('message: '+ message + '\ntag: '+ tag + "\n")
+            message_number = recieved_msg[:4]
+            tag = recieved_msg[4:68]
+            message = recieved_msg[68:]
+            
+            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
+            print("Message: " + message)
+            print("Tag: " + tag + "\n")
+            
         else:
-            print('message: ' + recieved_msg + "\n")
+            message_number = recieved_msg[:4]
+            message = recieved_msg[4:]
+            
+            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
+            print("Message: " + message + "\n")
+            
         message_behavior = 0
         #what are you doing w the message
         while (message_behavior < 1) or (message_behavior > 3):
             # TODO: error handling
-            message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob without alteration \n 2: Edit this message \n 3: Delete this message? \n")) 
+            message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob without alteration \n 2: Edit this message \n 3: Delete this message? \n"))
+            
             if message_behavior == 1: # send the message on w/o alteration
-                print("passing the message on")
+                print("Passing Message Along\n")
                 # bob_clientfd.send(recieved_msg.encode())
                 bob_clientfd.send(recieved_msg.encode())
+                
             elif message_behavior == 2: #alter message
-                alter_message(bob_clientfd, message, tag, enc, mac)
+                altered_message = alter_message(message, tag, enc, mac)
+                bob_clientfd.send(message_number.encode() + altered_message)
+                
             elif message_behavior == 3: # do not send the message
-                print("message dropped")
+                print("Dropping Message\n")
+                
             else: #bad input 
                 print("bad input, please enter 1, 2 or 3")
 
