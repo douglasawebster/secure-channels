@@ -114,61 +114,40 @@ def main():
     enc_session_key = None
     mac_key = None
     enc_mac_key = None
+    message_to_sign = None
+    
+    current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
 
     if enc and mac:
         session_key, enc_session_key = generate_session_key(bob_public_key)
-        current_time = datetime.now()         # Use timedelta to test elapsed time t1 = t2%t3
         mac_key = generate_mac_key()
         enc_mac_key = encrypt(mac_key, session_key)
-        
-        message_to_sign = "bob".encode() + (current_time.strftime("%m/%d/%Y, %H:%M:%S")).encode() + enc_session_key + enc_mac_key.encode()
-        digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
-        
-        set_up_msg = message_to_sign + digital_signature
-        clientfd.send(set_up_msg)
-        
-        print(len(current_time.strftime("%m/%d/%Y, %H:%M:%S").encode()))
-
-        print("Message For: Bob\n")
-        print("Time Sent: ", current_time.strftime("%m/%d/%Y, %H:%M:%S"), "\n")
-        print("Session Key: ", session_key, "\n")
-        print("Encrypted Session Key: ", enc_session_key, "\n")
-        print("Mac Key: ", mac_key, "\n")
-        print("Encrypted Mac Key: ", enc_mac_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
+        message_to_sign = "bob".encode() + current_time.encode() + enc_session_key + enc_mac_key.encode()
+    
 
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key)
-        current_time = datetime.now()
-        
-        message_to_sign = "bob".encode() + (current_time.strftime("%m/%d/%Y, %H:%M:%S")).encode() + enc_session_key
-        digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
-        
-        set_up_msg = message_to_sign + digital_signature
-        clientfd.send(set_up_msg)
+        message_to_sign = "bob".encode() + current_time.encode() + enc_session_key
 
-        print("Message For: Bob\n")
-        print("Time Sent: ", current_time.strftime("%m/%d/%Y, %H:%M:%S"), "\n")
-        print("Session Key: ", session_key, "\n")
-        print("Encrypted Session Key: ", enc_session_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
         
     elif mac:
         mac_key = generate_mac_key()
-        current_time = datetime.now()
+        message_to_sign = "bob".encode() + current_time.encode() + mac_key
+
         
-        message_to_sign = "bob".encode() + (current_time.strftime("%m/%d/%Y, %H:%M:%S")).encode() + mac_key
-        digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
-        
-        set_up_msg = message_to_sign + digital_signature
-        clientfd.send(set_up_msg)
-        
-        print(len(mac_key))
-        
-        print("Message For: Bob\n")
-        print("Time Sent: ", current_time.strftime("%m/%d/%Y, %H:%M:%S"), "\n")
-        print("Mac Key: ", mac_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
+    digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
+    set_up_msg = message_to_sign + digital_signature
+    clientfd.send(set_up_msg)
+    
+    print("Message For: Bob\n")
+    print("Time Sent: ", current_time, "\n")
+    
+    if session_key is not None: print("Session Key: ", session_key, "\n")
+    if enc_session_key is not None: print("Encrypted Session Key: ", enc_session_key, "\n")
+    if mac_key is not None: print("Mac Key: ", mac_key, "\n")
+    if enc_mac_key is not None: print("Encrypted Mac Key: ", enc_mac_key, "\n")
+    if enc_mac_key is not None: print("Digital Signature: ", digital_signature, "\n")
+
 
     # Message loop
     while(True):

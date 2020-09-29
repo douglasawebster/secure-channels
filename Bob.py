@@ -131,12 +131,12 @@ def main():
         initial_msg = connfd.recv(1024)
         
         msg_for = initial_msg[:3].decode()
-        time_sent = initial_msg[3:11].decode()
-        enc_session_key = initial_msg[11:267]
-        enc_mac_key = initial_msg[267:655].decode()
-        digital_signature = initial_msg[655:911]
+        time_sent_str = initial_msg[3:23].decode()
+        enc_session_key = initial_msg[23:279]
+        enc_mac_key = initial_msg[279:667].decode()
+        digital_signature = initial_msg[667:]
     
-        signed_msg = msg_for.encode() + time_sent.encode() + enc_session_key + enc_mac_key.encode()
+        signed_msg = msg_for.encode() + time_sent_str.encode() + enc_session_key + enc_mac_key.encode()
                 
         if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
             print("The Signature Is Authentic.\n")
@@ -145,26 +145,91 @@ def main():
             print("Terminating Connection!")
             exit(1)
             
+        time_sent = datetime.strptime(time_sent_str, "%m/%d/%Y, %H:%M:%S")
+        current_time = datetime.now()
+        
+        time_delta = current_time - time_sent
+        if time_delta.seconds > 120:
+            print("Too Much Time Has Elapsed!")
+            print("Terminating Connection!")
+            exit(1)
+            
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
         mac_key = decrypt(enc_mac_key, session_key)
         
         print("Message For: ", msg_for, "\n")
-        print("Time Sent: ", time_sent, "\n")
+        print("Time Sent: ", time_sent_str, "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
         print("Mac Key: ", mac_key, "\n")
         print("Encrypted Mac Key: ", enc_mac_key, "\n")
+        print("Digital Signature: ", digital_signature, "\n")
 
     elif enc: 
-        enc_session_key = connfd.recv(1024)
+        initial_msg = connfd.recv(1024)
+        
+        msg_for = initial_msg[:3].decode()
+        time_sent_str = initial_msg[3:23].decode()
+        enc_session_key = initial_msg[23:279]
+        digital_signature = initial_msg[279:]
+
+        signed_msg = msg_for.encode() + time_sent_str.encode() + enc_session_key
+        
+        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
+            print("The Signature Is Authentic.\n")
+        else:
+            print("The Signature Is Not Authentic.\n")
+            print("Terminating Connection!")
+            exit(1)
+            
+        time_sent = datetime.strptime(time_sent_str, "%m/%d/%Y, %H:%M:%S")
+        current_time = datetime.now()
+        
+        time_delta = current_time - time_sent
+        if time_delta.seconds > 120:
+            print("Too Much Time Has Elapsed!")
+            print("Terminating Connection!")
+            exit(1)
+        
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
+        
+        print("Message For: ", msg_for, "\n")
+        print("Time Sent: ", time_sent_str, "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
+        print("Digital Signature: ", digital_signature, "\n")
 
     elif mac:
-        mac_key = connfd.recv(1024)
-        print("Mac Key: ", mac_key, "\n")
+        initial_msg = connfd.recv(1024)
         
+        msg_for = initial_msg[:3].decode()
+        time_sent_str = initial_msg[3:23].decode()
+        mac_key = initial_msg[23:279]
+        digital_signature = initial_msg[279:]
+        
+        signed_msg = msg_for.encode() + time_sent_str.encode() + mac_key
+        
+        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
+            print("The Signature Is Authentic.\n")
+        else:
+            print("The Signature Is Not Authentic.\n")
+            print("Terminating Connection!")
+            exit(1)
+            
+        time_sent = datetime.strptime(time_sent_str, "%m/%d/%Y, %H:%M:%S")
+        current_time = datetime.now()
+        
+        time_delta = current_time - time_sent
+        if time_delta.seconds > 120:
+            print("Too Much Time Has Elapsed!")
+            print("Terminating Connection!")
+            exit(1)
+        
+        print("Message For: ", msg_for, "\n")
+        print("Time Sent: ", time_sent_str, "\n")
+        print("Mac Key: ", mac_key, "\n")
+        print("Digital Signature: ", digital_signature, "\n")
+
     # Message loop
     while(True):
         recieved_msg = connfd.recv(1024).decode()
@@ -229,6 +294,7 @@ def main():
             else: 
                 print("Message has been altered")
                 print("Terminating Connection!")
+                exit(1)
 
             print("Message Number: ", message_number)
             print("Tag: ", tag)
