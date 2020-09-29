@@ -43,9 +43,7 @@ def verify_message(msg, mac, key):
         return False
 
 def verify_message_num(message_num, expected_message_num):
-    if message_num != expected_message_num:
-        print("Messages Numbers Don't Line Up, Exiting!")
-        exit(1)
+    return message_num == expected_message_num
 
 def verify_digital_signature(msg, signature, key):
     hash = SHA256.new(msg)
@@ -72,7 +70,7 @@ def decrypt_session_key(enc_session_key, private_key):
 # session key: the AES session key 
 def decrypt(msg, session_key):
     try:
-        iv = msg[0:24]
+        iv = msg[:24]
         ct = msg[24:]
 
         cipher = AES.new(session_key, AES.MODE_CBC, b64decode(iv))
@@ -130,36 +128,27 @@ def main():
     session_key = None
     mac_key = None
     if enc and mac:
-        """enc_session_key = connfd.recv(1024)
-        session_key = decrypt_session_key(enc_session_key, bob_private_key)
-
-        recieved_msg = connfd.recv(1024).decode()
-        
-        
-        encrypted_mac_key = recieved_msg[64:]
-        mac_key = decrypt(encrypted_mac_key, session_key)"""
-        
         initial_msg = connfd.recv(1024)
         
-        msg_from = initial_msg[:3].decode()
+        msg_for = initial_msg[:3].decode()
         time_sent = initial_msg[3:11].decode()
         enc_session_key = initial_msg[11:267]
         enc_mac_key = initial_msg[267:655].decode()
         digital_signature = initial_msg[655:911]
-        
+    
+        signed_msg = msg_for.encode() + time_sent.encode() + enc_session_key + enc_mac_key.encode()
+                
+        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
+            print("The Signature Is Authentic.\n")
+        else:
+            print("The Signature Is Not Authentic.\n")
+            print("Terminating Connection!")
+            exit(1)
+            
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
         mac_key = decrypt(enc_mac_key, session_key)
         
-        signed_msg = msg_from.encode() + time_sent.encode() + enc_session_key + enc_mac_key.encode()
-        
-        print("Signed message: ", signed_msg)
-        
-        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
-            print("The Signature Is Authentic.")
-        else:
-            print("The Signature Is Not Authentic.")
-        
-        print("Message From: ", msg_from, "\n")
+        print("Message For: ", msg_for, "\n")
         print("Time Sent: ", time_sent, "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
@@ -184,16 +173,23 @@ def main():
             message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
             tag = recieved_msg[4:68]
             encrypted_message = recieved_msg[68:]
+            
+            if not verify_message_num(message_number, expected_message_num):
+                print("Messages Numbers Don't Line Up!")
+                print("Terminating Connection!")
+                exit(1)
+            else:
+                expected_message_num += 1
 
             if verify_message(encrypted_message, tag, mac_key):
                 print("Message Is Authentic")
             else:
                 print("Message Has Been Altered")
+                print("Terminating Connection!")
+                exit(1)
 
             decrypted_msg = decrypt(encrypted_message, session_key)
-            verify_message_num(message_number, expected_message_num)
-            expected_message_num += 1
-
+            
             print("Message Number: ", message_number)
             print("Encrypted Message: ", encrypted_message)
             print("Tag: ", tag)
@@ -202,10 +198,15 @@ def main():
         elif enc:
             message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
             encrypted_message = recieved_msg[4:]
+            
+            if not verify_message_num(message_number, expected_message_num):
+                print("Messages Numbers Don't Line Up!")
+                print("Terminating Connection!")
+                exit(1)
+            else:
+                expected_message_num += 1
 
             decrypted_msg = decrypt(encrypted_message, session_key)
-            verify_message_num(message_number, expected_message_num)
-            expected_message_num += 1
             
             print("Message Number: ", message_number)
             print("Encrypted Message: ", encrypted_message)
@@ -216,13 +217,18 @@ def main():
             tag = recieved_msg[4:68]
             message = recieved_msg[68:]
             
-            if verify_message(message, tag, mac_key):
-                print("\nMessage is authentic")
-            else: 
-                print("\nMessage has been altered")
+            if not verify_message_num(message_number, expected_message_num):
+                print("Messages Numbers Don't Line Up!")
+                print("Terminating Connection!")
+                exit(1)
+            else:
+                expected_message_num += 1
             
-            verify_message_num(message_number, expected_message_num)
-            expected_message_num += 1
+            if verify_message(message, tag, mac_key):
+                print("Message is authentic")
+            else: 
+                print("Message has been altered")
+                print("Terminating Connection!")
 
             print("Message Number: ", message_number)
             print("Tag: ", tag)
@@ -232,8 +238,12 @@ def main():
             message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
             message = recieved_msg[4:]
             
-            verify_message_num(message_number, expected_message_num)
-            expected_message_num += 1
+            if not verify_message_num(message_number, expected_message_num):
+                print("Messages Numbers Don't Line Up!")
+                print("Terminating Connection!")
+                exit(1)
+            else:
+                expected_message_num += 1
             
             print("Message Number: ", message_number)
             print("Plain Message: ", message, "\n")

@@ -48,7 +48,7 @@ def alter_message(msg, tag, enc, mac):
             elif behavior =='n':
                 tag = tag
             else:
-                print("please input 'y' to alter the mac tag or 'n' to send the original tag")
+                print("Please input 'y' to alter the mac tag or 'n' to send the original tag")
                 valid_behavior = False
         return (tag+msg).encode()
     else:
@@ -83,7 +83,6 @@ def main():
         print("invalid configuration " + config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
         quit(1)
 
-
     # Open a socket to listen to alice
     alice_listenfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     alice_listenfd.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -98,14 +97,12 @@ def main():
     (alice_connfd, addr) = alice_listenfd.accept()
     print("Connected to Alice")
 
-
     # Open a socket to broadcast to bob
     bob_clientfd = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     # Connect to server
     bob_clientfd.connect((host, int(bob_port)))
     print("Connected to Bob \n")
-
 
     alice_public, bob_public = read_keys()
 
@@ -181,7 +178,7 @@ def main():
                 print("Dropping Message\n")
                 
             else: # Bad input
-                print("bad input, please enter 1, 2 or 3")
+                print("Bad input, please enter 1, 2 or 3!")
 
     # Close connection
     alice_listenfd.close()

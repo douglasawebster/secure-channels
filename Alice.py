@@ -12,6 +12,8 @@ from Crypto.Signature import DSS
 from Crypto.Signature import pss
 from datetime import datetime
 
+# https://pycryptodome.readthedocs.io/en/latest/src/signature/pkcs1_pss.html
+
 # Reads in alice's private key and bob's public key
 def read_keys():
     f = open("./keys/alice_priv.pem", 'rb')
@@ -59,7 +61,7 @@ def generate_digital_signature(msg, key):
 # Encrypt a message with an AES CBC cipher
 # Takes a string msg to encode and the aes session key
 # Return a string beginning with the initialization vector, followed by the encrypted message
-def encrypt(msg, session_key): #, cipher_aes):
+def encrypt(msg, session_key):
     cipher_aes = AES.new(session_key, AES.MODE_CBC)
     ct_bytes = cipher_aes.encrypt(pad(msg, AES.block_size))
     iv = b64encode(cipher_aes.iv).decode('utf-8')
@@ -115,51 +117,22 @@ def main():
 
     if enc and mac:
         session_key, enc_session_key = generate_session_key(bob_public_key)
-        # send bob session key encrypted with NONMALLEABLE RSA (i think?)
-        # (this means we don't need MAC)
-        # (need to check this assumption lmaooo)
-        
-        # Use timedelta to test elapsed time t1 = t2 % t3
-        current_time = datetime.now()
+        current_time = datetime.now()         # Use timedelta to test elapsed time t1 = t2%t3
         mac_key = generate_mac_key()
         enc_mac_key = encrypt(mac_key, session_key)
         
-        # https://pycryptodome.readthedocs.io/en/latest/src/signature/pkcs1_pss.html
-        
         message_to_sign = "bob".encode() + (current_time.strftime("%H:%M:%S")).encode() + enc_session_key + enc_mac_key.encode()
-        
-        print("Signed message: ", message_to_sign)
-        
         digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
         
-        #print("Bob: ", len("bob".encode()))
-        #print("Time: ", len((current_time.strftime("%H:%M:%S")).encode()))
-        #print("Sign: ", len(digital_signature))
-        #print("Mac: ", len(enc_mac_key))
-        #print("Key: ", len(enc_session_key))
-        
-        set_up_msg = "bob".encode() + (current_time.strftime("%H:%M:%S")).encode() + enc_session_key + enc_mac_key.encode() + digital_signature
-        
+        set_up_msg = message_to_sign + digital_signature
         clientfd.send(set_up_msg)
 
-        # mac_key = generate_mac_key()
-        #the mac key encrypted under AES (of the form [iv+mac key])
-        # enc_mac_key = encrypt(mac_key, session_key)
-        # tag = generate_mac(enc_mac_key, mac_key)
-        # msg = tag + enc_mac_key
-        # mac hash
-        # 16-40: macIV
-        # 40- : encrypted mac key
-
-        print("Message From: Bob\n")
+        print("Message For: Bob\n")
         print("Time Sent: ", current_time.strftime("%H:%M:%S"), "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
         print("Mac Key: ", mac_key, "\n")
         print("Encrypted Mac Key: ", enc_mac_key, "\n")
-        # print("Tag: ", tag, "\n")
-
-        #clientfd.send(msg.encode())
 
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key)
@@ -180,36 +153,41 @@ def main():
     while(True):
         msg = input("Enter message: ")
         print()
-        # TODO: make sure we send the session key over in the first message
+        
         # Send encrypted message with mac tag
         if enc and mac:
             enc_message = encrypt(msg.encode(), session_key)
             tag = generate_mac(enc_message, mac_key)
 
-            msg = tag + enc_message
-            clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
-            message_number += 1
+            out_going_msg = message_number.to_bytes(4, byteorder='big') + (tag + enc_message).encode()
+            clientfd.send(out_going_msg)
 
             print("Message Number: ", message_number)
             print("Plain Message: ", msg)
             print("Encrypted Message: ", enc_message)
             print("Tag: ", tag, "\n")
+            
+            message_number += 1
         
         # Send encrypted message with no tags
         elif enc:
             enc_message = encrypt(msg.encode(), session_key)
-            clientfd.send((message_number).to_bytes(4, byteorder='big') + enc_message.encode())
-            message_number += 1
+            
+            out_going_msg = message_number.to_bytes(4, byteorder='big') + enc_message.encode()
+            clientfd.send(out_going_msg)
             
             print("Message Number: ", message_number)
             print("Plain Message: ", msg)
             print("Encrypted Message: ", enc_message, "\n")
+            
+            message_number += 1
 
         # Send plaintext with mac tag
         elif mac: 
             tag = generate_mac(msg, mac_key)
-            msg = tag +  msg
-            clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
+            
+            out_going_msg = message_number.to_bytes(4, byteorder='big') + (tag +  msg).encode()
+            clientfd.send(out_going_msg)
             
             print("Message Number: ", message_number)
             print("Plain Message: ", msg)
@@ -219,7 +197,8 @@ def main():
         
         # Send message in plaintext
         else:
-            clientfd.send((message_number).to_bytes(4, byteorder='big') + msg.encode())
+            out_going_msg = message_number.to_bytes(4, byteorder='big') + msg.encode()
+            clientfd.send(out_going_msg)
             
             print("Message Number: ", message_number)
             print("Plain Message: ", msg, "\n")
