@@ -1,6 +1,5 @@
 import sys
 import socket
-import json
 from os import _exit as quit
 from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
@@ -8,6 +7,10 @@ from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Util.Padding import pad
 from base64 import b64encode, b64decode
 from Crypto.Hash import HMAC, SHA256
+from Crypto.PublicKey import ECC
+from Crypto.Signature import DSS
+from Crypto.Signature import pss
+from datetime import datetime
 
 # Reads in alice's private key and bob's public key
 def read_keys():
@@ -46,6 +49,12 @@ def generate_mac(msg, key):
     h = HMAC.new(key, digestmod=SHA256)
     h.update(msg.encode())
     return h.hexdigest()
+    
+# Return a signature for a message
+def generate_digital_signature(msg, key):
+    hash = SHA256.new(msg)
+    signature = pss.new(key).sign(hash)
+    return signature
     
 # Encrypt a message with an AES CBC cipher
 # Takes a string msg to encode and the aes session key
@@ -93,7 +102,7 @@ def main():
 
     # Connect to server
     clientfd.connect((host, int(port)))
-    print("Connected to server")
+    print("Connected to server\n")
 
 
     alice_private_key, alice_public_key, bob_public_key = read_keys()
@@ -108,25 +117,49 @@ def main():
         session_key, enc_session_key = generate_session_key(bob_public_key)
         # send bob session key encrypted with NONMALLEABLE RSA (i think?)
         # (this means we don't need MAC)
-        # (need to check this assumption lmaooo)        
-        clientfd.send(enc_session_key)    
-
+        # (need to check this assumption lmaooo)
+        
+        # Use timedelta to test elapsed time t1 = t2 % t3
+        current_time = datetime.now()
         mac_key = generate_mac_key()
+        enc_mac_key = encrypt(mac_key, session_key)
+        
+        # https://pycryptodome.readthedocs.io/en/latest/src/signature/pkcs1_pss.html
+        
+        message_to_sign = "bob".encode() + (current_time.strftime("%H:%M:%S")).encode() + enc_session_key + enc_mac_key.encode()
+        
+        print("Signed message: ", message_to_sign)
+        
+        digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
+        
+        #print("Bob: ", len("bob".encode()))
+        #print("Time: ", len((current_time.strftime("%H:%M:%S")).encode()))
+        #print("Sign: ", len(digital_signature))
+        #print("Mac: ", len(enc_mac_key))
+        #print("Key: ", len(enc_session_key))
+        
+        set_up_msg = "bob".encode() + (current_time.strftime("%H:%M:%S")).encode() + enc_session_key + enc_mac_key.encode() + digital_signature
+        
+        clientfd.send(set_up_msg)
+
+        # mac_key = generate_mac_key()
         #the mac key encrypted under AES (of the form [iv+mac key])
-        enc_mac_key = encrypt(mac_key, session_key) 
-        tag = generate_mac(enc_mac_key, mac_key)
-        msg = tag + enc_mac_key
+        # enc_mac_key = encrypt(mac_key, session_key)
+        # tag = generate_mac(enc_mac_key, mac_key)
+        # msg = tag + enc_mac_key
         # mac hash
         # 16-40: macIV
         # 40- : encrypted mac key
 
+        print("Message From: Bob\n")
+        print("Time Sent: ", current_time.strftime("%H:%M:%S"), "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
         print("Mac Key: ", mac_key, "\n")
         print("Encrypted Mac Key: ", enc_mac_key, "\n")
-        print("Tag: ", tag, "\n")
+        # print("Tag: ", tag, "\n")
 
-        clientfd.send(msg.encode())
+        #clientfd.send(msg.encode())
 
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key)

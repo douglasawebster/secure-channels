@@ -8,7 +8,8 @@ from Crypto.Util.Padding import unpad
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Hash import HMAC, SHA256
 import base64
-import json
+from datetime import datetime
+from Crypto.Signature import pss
 
 # Reads in bob's private key and alices's public key
 def read_keys():
@@ -45,6 +46,16 @@ def verify_message_num(message_num, expected_message_num):
     if message_num != expected_message_num:
         print("Messages Numbers Don't Line Up, Exiting!")
         exit(1)
+
+def verify_digital_signature(msg, signature, key):
+    hash = SHA256.new(msg)
+    verifier = pss.new(key)
+    
+    try:
+        verifier.verify(hash, signature)
+        return True
+    except:
+        return False
         
 # Decrypt an aes session key that was encrypted with your RSA public key
 # Returns byte string session_key
@@ -119,19 +130,41 @@ def main():
     session_key = None
     mac_key = None
     if enc and mac:
-        enc_session_key = connfd.recv(1024)
+        """enc_session_key = connfd.recv(1024)
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
 
         recieved_msg = connfd.recv(1024).decode()
-        tag = recieved_msg[:64]
+        
+        
         encrypted_mac_key = recieved_msg[64:]
-        mac_key = decrypt(encrypted_mac_key, session_key)
-
+        mac_key = decrypt(encrypted_mac_key, session_key)"""
+        
+        initial_msg = connfd.recv(1024)
+        
+        msg_from = initial_msg[:3].decode()
+        time_sent = initial_msg[3:11].decode()
+        enc_session_key = initial_msg[11:267]
+        enc_mac_key = initial_msg[267:655].decode()
+        digital_signature = initial_msg[655:911]
+        
+        session_key = decrypt_session_key(enc_session_key, bob_private_key)
+        mac_key = decrypt(enc_mac_key, session_key)
+        
+        signed_msg = msg_from.encode() + time_sent.encode() + enc_session_key + enc_mac_key.encode()
+        
+        print("Signed message: ", signed_msg)
+        
+        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
+            print("The Signature Is Authentic.")
+        else:
+            print("The Signature Is Not Authentic.")
+        
+        print("Message From: ", msg_from, "\n")
+        print("Time Sent: ", time_sent, "\n")
         print("Session Key: ", session_key, "\n")
         print("Encrypted Session Key: ", enc_session_key, "\n")
         print("Mac Key: ", mac_key, "\n")
-        print("Encrypted Mac Key: ", encrypted_mac_key, "\n")
-        print("Tag: ", tag, "\n")
+        print("Encrypted Mac Key: ", enc_mac_key, "\n")
 
     elif enc: 
         enc_session_key = connfd.recv(1024)

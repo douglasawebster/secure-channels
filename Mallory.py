@@ -113,9 +113,6 @@ def main():
     if enc and mac:
         recieved_msg = alice_connfd.recv(1024)
         bob_clientfd.send(recieved_msg)
-
-        recieved_msg = alice_connfd.recv(1024)
-        bob_clientfd.send(recieved_msg)
         
     elif enc:
         recieved_msg = alice_connfd.recv(1024)

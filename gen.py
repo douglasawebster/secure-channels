@@ -13,18 +13,18 @@ def generate_keys():
     bob_public_key = bob_key.publickey().export_key('PEM')
 
     # Writing Alice's keys
-    f = open('./keys/alice_priv.pem','wb')
+    f = open("./keys/alice_priv.pem",'wb')
     f.write(alice_private_key)
     f.close()
-    f = open('./keys/alice_public.pem','wb')
+    f = open("./keys/alice_public.pem",'wb')
     f.write(alice_public_key)
     f.close()
 
     # Writing Bob's keys
-    f = open('./keys/bob_priv.pem', 'wb')
+    f = open("./keys/bob_priv.pem", 'wb')
     f.write(bob_private_key)
     f.close()
-    f = open('./keys/bob_public.pem', 'wb')
+    f = open("./keys/bob_public.pem", 'wb')
     f.write(bob_public_key)
     f.close()
 
