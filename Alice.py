@@ -97,6 +97,7 @@ def main():
         print("invalid configuration "+ config + " valid configuration options: noCrypto, enc, mac, EncThenMac")
         quit(1)
 
+    # Keeps track of the message number
     message_number = 0
 
     # Open a socket
@@ -106,7 +107,7 @@ def main():
     clientfd.connect((host, int(port)))
     print("Connected to server\n")
 
-
+    # Read in keys
     alice_private_key, alice_public_key, bob_public_key = read_keys()
 
     # Load requested tools
@@ -114,96 +115,75 @@ def main():
     enc_session_key = None
     mac_key = None
     enc_mac_key = None
-    message_to_sign = None
     
     current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    message_to_sign = "bob".encode() + current_time.encode()
 
     if enc and mac:
         session_key, enc_session_key = generate_session_key(bob_public_key)
         mac_key = generate_mac_key()
         enc_mac_key = encrypt(mac_key, session_key)
-        message_to_sign = "bob".encode() + current_time.encode() + enc_session_key + enc_mac_key.encode()
-    
+        message_to_sign += enc_session_key + enc_mac_key.encode()
 
     elif enc:
         session_key, enc_session_key = generate_session_key(bob_public_key)
-        message_to_sign = "bob".encode() + current_time.encode() + enc_session_key
-
+        message_to_sign += enc_session_key
         
     elif mac:
         mac_key = generate_mac_key()
-        message_to_sign = "bob".encode() + current_time.encode() + mac_key
-
+        message_to_sign += mac_key
+    
+    if enc or mac:
+        digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
+        set_up_msg = message_to_sign + digital_signature
+        clientfd.send(set_up_msg)
         
-    digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
-    set_up_msg = message_to_sign + digital_signature
-    clientfd.send(set_up_msg)
+        print("Message For: Bob\n")
+        print("Time Sent: ", current_time, "\n")
+        if session_key is not None: print("Session Key: ", session_key, "\n")
+        if enc_session_key is not None: print("Encrypted Session Key: ", enc_session_key, "\n")
+        if mac_key is not None: print("Mac Key: ", mac_key, "\n")
+        if enc_mac_key is not None: print("Encrypted Mac Key: ", enc_mac_key, "\n")
+        if digital_signature is not None: print("Digital Signature: ", digital_signature, "\n")
     
-    print("Message For: Bob\n")
-    print("Time Sent: ", current_time, "\n")
-    
-    if session_key is not None: print("Session Key: ", session_key, "\n")
-    if enc_session_key is not None: print("Encrypted Session Key: ", enc_session_key, "\n")
-    if mac_key is not None: print("Mac Key: ", mac_key, "\n")
-    if enc_mac_key is not None: print("Encrypted Mac Key: ", enc_mac_key, "\n")
-    if enc_mac_key is not None: print("Digital Signature: ", digital_signature, "\n")
-
-
     # Message loop
     while(True):
         msg = input("Enter message: ")
         print()
         
+        enc_message = None
+        tag = None
+        
+        out_going_msg = message_number.to_bytes(4, byteorder='big')
+        
         # Send encrypted message with mac tag
         if enc and mac:
             enc_message = encrypt(msg.encode(), session_key)
             tag = generate_mac(enc_message, mac_key)
+            out_going_msg += (tag + enc_message).encode()
 
-            out_going_msg = message_number.to_bytes(4, byteorder='big') + (tag + enc_message).encode()
-            clientfd.send(out_going_msg)
-
-            print("Message Number: ", message_number)
-            print("Plain Message: ", msg)
-            print("Encrypted Message: ", enc_message)
-            print("Tag: ", tag, "\n")
-            
-            message_number += 1
-        
         # Send encrypted message with no tags
         elif enc:
             enc_message = encrypt(msg.encode(), session_key)
-            
-            out_going_msg = message_number.to_bytes(4, byteorder='big') + enc_message.encode()
-            clientfd.send(out_going_msg)
-            
-            print("Message Number: ", message_number)
-            print("Plain Message: ", msg)
-            print("Encrypted Message: ", enc_message, "\n")
-            
-            message_number += 1
+            out_going_msg += enc_message.encode()
 
         # Send plaintext with mac tag
         elif mac: 
             tag = generate_mac(msg, mac_key)
-            
-            out_going_msg = message_number.to_bytes(4, byteorder='big') + (tag +  msg).encode()
-            clientfd.send(out_going_msg)
-            
-            print("Message Number: ", message_number)
-            print("Plain Message: ", msg)
-            print("Tag: ", tag, "\n")
-            
-            message_number += 1
+            out_going_msg += (tag +  msg).encode()
         
         # Send message in plaintext
         else:
-            out_going_msg = message_number.to_bytes(4, byteorder='big') + msg.encode()
-            clientfd.send(out_going_msg)
+            out_going_msg += msg.encode()
+
+        clientfd.send(out_going_msg)
+
+        print("Message Number: ", message_number)
+        print("Plain Message: ", msg)
+        if enc_message is not None: print("Encrypted Message: ", enc_message)
+        if tag is not None: print("Tag: ", tag, "\n")
             
-            print("Message Number: ", message_number)
-            print("Plain Message: ", msg, "\n")
-            
-            message_number += 1
+        message_number += 1
 
     # Close connection
     clientfd.close()

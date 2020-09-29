@@ -126,89 +126,42 @@ def main():
 
     # Load crypto tools if needed
     session_key = None
+    enc_session_key = None
     mac_key = None
+    enc_mac_key = None
+    digital_signature = None
+    
+    initial_msg = connfd.recv(1024)
+    msg_for = initial_msg[:3].decode()
+    time_sent_str = initial_msg[3:23].decode()
+    
+    signed_msg = msg_for.encode() + time_sent_str.encode()
+    
     if enc and mac:
-        initial_msg = connfd.recv(1024)
-        
-        msg_for = initial_msg[:3].decode()
-        time_sent_str = initial_msg[3:23].decode()
         enc_session_key = initial_msg[23:279]
         enc_mac_key = initial_msg[279:667].decode()
         digital_signature = initial_msg[667:]
-    
-        signed_msg = msg_for.encode() + time_sent_str.encode() + enc_session_key + enc_mac_key.encode()
                 
-        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
-            print("The Signature Is Authentic.\n")
-        else:
-            print("The Signature Is Not Authentic.\n")
-            print("Terminating Connection!")
-            exit(1)
-            
-        time_sent = datetime.strptime(time_sent_str, "%m/%d/%Y, %H:%M:%S")
-        current_time = datetime.now()
-        
-        time_delta = current_time - time_sent
-        if time_delta.seconds > 120:
-            print("Too Much Time Has Elapsed!")
-            print("Terminating Connection!")
-            exit(1)
-            
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
         mac_key = decrypt(enc_mac_key, session_key)
         
-        print("Message For: ", msg_for, "\n")
-        print("Time Sent: ", time_sent_str, "\n")
-        print("Session Key: ", session_key, "\n")
-        print("Encrypted Session Key: ", enc_session_key, "\n")
-        print("Mac Key: ", mac_key, "\n")
-        print("Encrypted Mac Key: ", enc_mac_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
+        signed_msg += enc_session_key + enc_mac_key.encode()
 
-    elif enc: 
-        initial_msg = connfd.recv(1024)
-        
-        msg_for = initial_msg[:3].decode()
-        time_sent_str = initial_msg[3:23].decode()
+    elif enc:
         enc_session_key = initial_msg[23:279]
         digital_signature = initial_msg[279:]
 
-        signed_msg = msg_for.encode() + time_sent_str.encode() + enc_session_key
-        
-        if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
-            print("The Signature Is Authentic.\n")
-        else:
-            print("The Signature Is Not Authentic.\n")
-            print("Terminating Connection!")
-            exit(1)
-            
-        time_sent = datetime.strptime(time_sent_str, "%m/%d/%Y, %H:%M:%S")
-        current_time = datetime.now()
-        
-        time_delta = current_time - time_sent
-        if time_delta.seconds > 120:
-            print("Too Much Time Has Elapsed!")
-            print("Terminating Connection!")
-            exit(1)
-        
         session_key = decrypt_session_key(enc_session_key, bob_private_key)
-        
-        print("Message For: ", msg_for, "\n")
-        print("Time Sent: ", time_sent_str, "\n")
-        print("Session Key: ", session_key, "\n")
-        print("Encrypted Session Key: ", enc_session_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
+
+        signed_msg += enc_session_key
 
     elif mac:
-        initial_msg = connfd.recv(1024)
-        
-        msg_for = initial_msg[:3].decode()
-        time_sent_str = initial_msg[3:23].decode()
         mac_key = initial_msg[23:279]
         digital_signature = initial_msg[279:]
         
         signed_msg = msg_for.encode() + time_sent_str.encode() + mac_key
         
+    if enc or mac:
         if verify_digital_signature(signed_msg, digital_signature, alice_public_key):
             print("The Signature Is Authentic.\n")
         else:
@@ -227,93 +180,61 @@ def main():
         
         print("Message For: ", msg_for, "\n")
         print("Time Sent: ", time_sent_str, "\n")
-        print("Mac Key: ", mac_key, "\n")
-        print("Digital Signature: ", digital_signature, "\n")
+        print("Time Recieved: ", current_time, "\n")
+        if session_key is not None: print("Session Key: ", session_key, "\n")
+        if enc_session_key is not None: print("Encrypted Session Key: ", enc_session_key, "\n")
+        if mac_key is not None: print("Mac Key: ", mac_key, "\n")
+        if enc_mac_key is not None: print("Encrypted Mac Key: ", enc_mac_key, "\n")
+        if digital_signature is not None: print("Digital Signature: ", digital_signature, "\n")
 
     # Message loop
     while(True):
         recieved_msg = connfd.recv(1024).decode()
+        
+        message = None
+        encrypted_message = None
+        tag = None
+        decrypted_msg = None
+        
+        message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
 
         if enc and mac:
-            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
             tag = recieved_msg[4:68]
             encrypted_message = recieved_msg[68:]
-            
-            if not verify_message_num(message_number, expected_message_num):
-                print("Messages Numbers Don't Line Up!")
-                print("Terminating Connection!")
-                exit(1)
-            else:
-                expected_message_num += 1
+            message = decrypt(encrypted_message, session_key)
 
-            if verify_message(encrypted_message, tag, mac_key):
+        elif enc:
+            encrypted_message = recieved_msg[4:]
+            message = decrypt(encrypted_message, session_key)
+
+        elif mac:
+            tag = recieved_msg[4:68]
+            message = recieved_msg[68:]
+
+        else:
+            message = recieved_msg[4:]
+            
+            
+        if not verify_message_num(message_number, expected_message_num):
+            print("Messages Numbers Don't Line Up!")
+            print("Terminating Connection!")
+            exit(1)
+        else:
+            expected_message_num += 1
+
+        if mac:
+            message_to_verify = encrypted_message if enc else message
+            if verify_message(message_to_verify, tag, mac_key):
                 print("Message Is Authentic")
             else:
                 print("Message Has Been Altered")
                 print("Terminating Connection!")
                 exit(1)
-
-            decrypted_msg = decrypt(encrypted_message, session_key)
-            
-            print("Message Number: ", message_number)
-            print("Encrypted Message: ", encrypted_message)
-            print("Tag: ", tag)
-            print("Plain Message: ", decrypted_msg, "\n")
-
-        elif enc:
-            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
-            encrypted_message = recieved_msg[4:]
-            
-            if not verify_message_num(message_number, expected_message_num):
-                print("Messages Numbers Don't Line Up!")
-                print("Terminating Connection!")
-                exit(1)
-            else:
-                expected_message_num += 1
-
-            decrypted_msg = decrypt(encrypted_message, session_key)
-            
-            print("Message Number: ", message_number)
-            print("Encrypted Message: ", encrypted_message)
-            print("Plain Message: ", decrypted_msg, "\n")
-
-        elif mac:
-            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
-            tag = recieved_msg[4:68]
-            message = recieved_msg[68:]
-            
-            if not verify_message_num(message_number, expected_message_num):
-                print("Messages Numbers Don't Line Up!")
-                print("Terminating Connection!")
-                exit(1)
-            else:
-                expected_message_num += 1
-            
-            if verify_message(message, tag, mac_key):
-                print("Message is authentic")
-            else: 
-                print("Message has been altered")
-                print("Terminating Connection!")
-                exit(1)
-
-            print("Message Number: ", message_number)
-            print("Tag: ", tag)
-            print("Plain Message: ", message, "\n")
-
-        else:
-            message_number = int.from_bytes(recieved_msg[:4].encode(), "big")
-            message = recieved_msg[4:]
-            
-            if not verify_message_num(message_number, expected_message_num):
-                print("Messages Numbers Don't Line Up!")
-                print("Terminating Connection!")
-                exit(1)
-            else:
-                expected_message_num += 1
-            
-            print("Message Number: ", message_number)
-            print("Plain Message: ", message, "\n")
-
+        
+        print("Message Number: ", message_number)
+        if encrypted_message is not None: print("Encrypted Message: ", encrypted_message)
+        if tag is not None: print("Tag: ", tag)
+        print("Plain Message: ", message, "\n")
 
     # Close connection
     connfd.close()

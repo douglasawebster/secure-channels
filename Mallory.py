@@ -102,7 +102,7 @@ def main():
 
     # Connect to server
     bob_clientfd.connect((host, int(bob_port)))
-    print("Connected to Bob \n")
+    print("Connected to Bob\n")
 
     alice_public, bob_public = read_keys()
 
@@ -133,32 +133,22 @@ def main():
             tag = recieved_msg[4:68]
             message = recieved_msg[68:]
             
-            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
-            print("Encrypted Message: " + message)
-            print("Tag: " + tag + "\n")
-            
         elif enc:
             message_number = recieved_msg[:4]
             message = recieved_msg[4:]
-            
-            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
-            print("Encrypted Message: " + message + "\n")
             
         elif mac:
             message_number = recieved_msg[:4]
             tag = recieved_msg[4:68]
             message = recieved_msg[68:]
             
-            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
-            print("Message: " + message)
-            print("Tag: " + tag + "\n")
-            
         else:
             message_number = recieved_msg[:4]
             message = recieved_msg[4:]
             
-            print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
-            print("Message: " + message + "\n")
+        if message_number is not None: print("Message Number: ", int.from_bytes(message_number.encode(), "big"))
+        if message is not None: print("Message: " + message)
+        if tag is not None: print("Tag: " + tag + "\n")
             
         message_behavior = 0
         # What are you doing w the message
