@@ -1,0 +1,33 @@
+
+
+1. Show how Mallory can read the contents of a message that is sent with no cryptography:
+
+Start the system in noCrypto mode, as described in the readme
+Have Alice send any message
+Mallory will recieve it and display it. press 1 to have Mallory pass it on to Bob.
+
+2. Show how Mallory can read the contents of a message that is sent with MACs only.
+
+Start the system in mac mode, as described in the readme
+Have Alice send any message
+Mallory will recieve it and display it. press 1 to have Mallory pass it on to Bob.
+
+3. Show how Mallory can undetectedly modify a message that is sent with no cryptography.
+
+Start the system in noCrypto mode, as described in the readme
+Have Alice send any message
+Mallory will recieve and display the message, then prompt for behavior. Enter 2 (modify), y(es) to confirm, then input your new message and press enter. It will be sent to Bob.
+
+4. Show how Mallory can undetectedly modify a message that is sent with symmetric encryption only.
+
+This SHOULD be possible but I can't get the blocks to behave
+
+5. Show how Mallory can undetectedly replay an old message that is sent with Enc-then-MAC
+
+Start the system in EncThenMac configuration.
+Have Alice send some message M1 to Mallory
+Mallory will recieve and display the message, then prompt for behavior. Enter 4 (store) and y(es) to confirm. This will store the message. You will be prompted for behavior again, input 1 (pass on) to pass the original message to Bob. 
+Bob will recieve the message M1
+Have Alice send a new message M2
+When Mallory prompts for behavior, enter 5 (replay), y(es) to replay the stored message
+

@@ -77,7 +77,7 @@ def decrypt(msg, session_key):
         pt = unpad(cipher.decrypt(b64decode(ct)), AES.block_size)
         return pt
     except ValueError:
-        return
+        return "decryption failled, message corrupted"
 
 def main():
     
@@ -130,12 +130,18 @@ def main():
     mac_key = None
     enc_mac_key = None
     digital_signature = None
+
+    initial_msg = None
+    msg_for = None
+    time_sent_str = None
+    signed_msg = None
     
-    initial_msg = connfd.recv(1024)
-    msg_for = initial_msg[:3].decode()
-    time_sent_str = initial_msg[3:23].decode()
-    
-    signed_msg = msg_for.encode() + time_sent_str.encode()
+    if enc or mac:
+        initial_msg = connfd.recv(1024)
+        msg_for = initial_msg[:3].decode()
+        time_sent_str = initial_msg[3:23].decode()
+        
+        signed_msg = msg_for.encode() + time_sent_str.encode()
     
     if enc and mac:
         enc_session_key = initial_msg[23:279]
@@ -187,10 +193,11 @@ def main():
         if enc_mac_key is not None: print("Encrypted Mac Key: ", enc_mac_key, "\n")
         if digital_signature is not None: print("Digital Signature: ", digital_signature, "\n")
 
+    print('recieving')
     # Message loop
     while(True):
         recieved_msg = connfd.recv(1024).decode()
-        
+        print('recieved:' + recieved_msg)
         message = None
         encrypted_message = None
         tag = None

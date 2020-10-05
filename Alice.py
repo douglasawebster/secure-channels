@@ -65,7 +65,10 @@ def encrypt(msg, session_key):
     cipher_aes = AES.new(session_key, AES.MODE_CBC)
     ct_bytes = cipher_aes.encrypt(pad(msg, AES.block_size))
     iv = b64encode(cipher_aes.iv).decode('utf-8')
+    print('iv: '+ iv + "\n bytes: ") 
+    print((cipher_aes.iv))
     cipher_text = b64encode(ct_bytes).decode('utf-8')
+    print('ciphr: '+ cipher_text + "\n bytes: ")
     result = iv + cipher_text
 
     return result

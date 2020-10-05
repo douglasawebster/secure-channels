@@ -30,6 +30,20 @@ def alter_message(msg, tag, enc, mac):
         behavior = input('would you like to change the message body? (y/n) ')
         if behavior == 'y':
             if enc:
+                iv = b64decode(msg[:24].encode('utf-8'))
+                msg = b64decode(msg[24:].encode('utf-8'))
+                print(iv)
+                print()
+                print(msg)
+                print("the current iv is: " + b64encode(iv).decode('utf-8'))
+                print("here are the blocks of the current ciphertext:")
+                i = 0
+                while (i+16<=len(msg)):
+                    print ("i = " + str(i) + " len = "+ str(len(msg)))
+                    print(b64encode(msg[i:i+16]).decode('utf-8'))
+                    i+= 16
+                print(msg[i:])
+                iv = input("Please enter an IV: ")
                 msg = input("Please enter new ciphertext: ")
             else:
                 msg = input("Please enter a new message: ")
@@ -105,6 +119,10 @@ def main():
     print("Connected to Bob\n")
 
     alice_public, bob_public = read_keys()
+    
+    
+    stored_msg = None
+    stored_tag = None
 
     # Pass on keys
     if enc and mac:
@@ -152,9 +170,9 @@ def main():
             
         message_behavior = 0
         # What are you doing w the message
-        while (message_behavior < 1) or (message_behavior > 3):
+        while (message_behavior < 1) or (message_behavior > 5):
             # TODO: error handling
-            message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob without alteration \n 2: Edit this message \n 3: Delete this message? \n"))
+            message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob without alteration \n 2: Edit this message \n 3: Delete this message? \n 4: Store this message \n 5: Replay the stored message \n"))
             
             if message_behavior == 1: # Send message as is
                 print("Passing Message Along\n")
@@ -166,9 +184,37 @@ def main():
                 
             elif message_behavior == 3: # Drop message
                 print("Dropping Message\n")
-                
+
+            elif message_behavior == 4:
+                print("Current stored message is: "+ str(stored_msg) + "\n would you like to overwrite it with " + message)
+                behavior = input ("replace stored message? y/n \n")
+                if behavior == 'y':
+                    stored_msg = message
+                    if mac:
+                        stored_tag = tag
+                    print("new stored message is : "+ stored_msg )
+                elif behavior == n:
+                    print("keeping " + stored_msg + "stored \n")
+                else:
+                    print("please enter y(es) or n(o)")
+                message_behavior = 0
+                print("what would you like to do with message " + message)
+
+            elif message_behavior == 5:
+                if stored_msg == None:
+                    print("You have no message stored! Try something else")
+                    message_behavior = 0
+                else:
+                    print("Current stored message is " + str(stored_msg) + "\n would you like to send it to Bob?\n")
+                    behavior = input("send stored message? y/n \n")
+                    if behavior == 'y':
+                        print("replaying")
+                        if mac:
+                            bob_clientfd.send(message_number.encode() + stored_tag.encode() +stored_msg.encode())
+                        else:
+                            bob_clientfd.send(message_number.encode() + stored_msg.encode())
             else: # Bad input
-                print("Bad input, please enter 1, 2 or 3!")
+                print("Bad input, please enter a number, 1-5")
 
     # Close connection
     alice_listenfd.close()
