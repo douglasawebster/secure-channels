@@ -50,7 +50,7 @@ def alter_message(msg, tag, enc, mac):
         elif behavior == 'n':
             msg = msg
         else:
-            print("please input 'y' to alter the message or 'n' to send the original emssage")
+            print("please input 'y' to alter the message or 'n' to send the original message")
             valid_behavior = False
     if mac:
         valid_behavior = False
@@ -67,8 +67,126 @@ def alter_message(msg, tag, enc, mac):
         return (tag+msg).encode()
     else:
         return msg.encode()
-
-
+        
+def alter_init_message(msg, enc, mac):
+    altered_message = ""
+    
+    valid_behavior = False
+    while not valid_behavior:
+        valid_behavior = True
+    
+        message_for = msg[:3].decode()
+        time_sent = msg[3:23].decode()
+        
+        behavior = input("Would you like to change who the message if for? (y/n)")
+        if behavior == "y":
+            message_for = input("Please enter a new name: ")
+            altered_message += message_for
+        elif behavior == "n":
+            altered_message += message_for
+        else:
+            print("please input 'y' to alter the message or 'n' to send the original message")
+            valid_behavior = False
+            continue
+        
+        behavior = input("Would you like to change the time the message was sent? (y/n)")
+        if behavior == "y":
+            time_sent = input("Enter new time sent for message (%m/%d/%Y, %H:%M:%S)")
+            altered_message += time_sent
+        elif behavior == "n":
+            altered_message += time_sent
+        else:
+            print("please input 'y' to alter the message or 'n' to send the original message")
+            valid_behavior = False
+            continue
+            
+        if enc and mac:
+            enc_session_key = msg[23:279]
+            enc_mac_key = msg[279:667].decode()
+            digital_signature = msg[667:]
+            
+            behavior = input("Would you like to change the enc session key? (y/n)")
+            if behavior == "y":
+                enc_session_key = input("Enter new enc session key: ").encode()
+            elif behavior == "n":
+                enc_session_key = enc_session_key
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                
+            behavior = input("Would you like to change the enc mac key? (y/n)")
+            if behavior == "y":
+                enc_mac_key = input("Enter new enc mac key: ")
+            elif behavior == "n":
+                enc_mac_key = enc_mac_key
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                
+            behavior = input("Would you like to change the digital signature? (y/n)")
+            if behavior == "y":
+                digital_signature = input("Enter new digital signature: ").encode()
+            elif behavior == "n":
+                digital_signature = digital_signature
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                                
+            return altered_message.encode() + enc_session_key + enc_mac_key.encode() + digital_signature
+        elif enc:
+            enc_session_key = msg[23:279]
+            digital_signature = msg[279:]
+            
+            behavior = input("Would you like to change the enc session key? (y/n)")
+            if behavior == "y":
+                enc_session_key = input("Enter new enc session key: ").encode()
+            elif behavior == "n":
+                enc_session_key = enc_session_key
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                
+            behavior = input("Would you like to change the digital signature? (y/n)")
+            if behavior == "y":
+                digital_signature = input("Enter new digital signature: ").encode()
+            elif behavior == "n":
+                digital_signature = digital_signature
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                                
+            return altered_message.encode() + enc_session_key + digital_signature
+        elif mac:
+            mac_key = msg[23:279]
+            digital_signature = msg[279:]
+        
+            behavior = input("Would you like to change the mac key? (y/n)")
+            if behavior == "y":
+                mac_key = input("Enter new mac key: ").encode()
+            elif behavior == "n":
+                mac_key = mac_key
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                
+            behavior = input("Would you like to change the digital signature? (y/n)")
+            if behavior == "y":
+                digital_signature = input("Enter new digital signature: ").encode()
+            elif behavior == "n":
+                digital_signature = digital_signature
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+                                
+            return altered_message.encode() + mac_key + digital_signature
+                
 def main():
 
     # Parse arguments
@@ -123,19 +241,28 @@ def main():
     
     stored_msg = None
     stored_tag = None
-
     # Pass on keys
-    if enc and mac:
+    if enc or mac:
         recieved_msg = alice_connfd.recv(1024)
-        bob_clientfd.send(recieved_msg)
+
+        init_message_for_bob = None
         
-    elif enc:
-        recieved_msg = alice_connfd.recv(1024)
-        bob_clientfd.send(recieved_msg)
-    
-    elif mac:
-        recieved_msg = alice_connfd.recv(1024)
-        bob_clientfd.send(recieved_msg)
+        valid_behavior = False
+        while not valid_behavior:
+            valid_behavior = True
+
+            behavior = input("Would you like to alter the init message? (y/n)")
+
+            if behavior == "y":
+                init_message_for_bob = alter_init_message(recieved_msg, enc, mac)
+            elif behavior == "n":
+                init_message_for_bob = recieved_msg
+            else:
+                print("please input 'y' to alter the message or 'n' to send the original message")
+                valid_behavior = False
+                continue
+            
+        bob_clientfd.send(init_message_for_bob)
     
     # message loop
     while(True):
@@ -171,7 +298,6 @@ def main():
         message_behavior = 0
         # What are you doing w the message
         while (message_behavior < 1) or (message_behavior > 5):
-            # TODO: error handling
             message_behavior = int(input("Would you like to: \n 1: Pass this message to Bob without alteration \n 2: Edit this message \n 3: Delete this message? \n 4: Store this message \n 5: Replay the stored message \n"))
             
             if message_behavior == 1: # Send message as is
@@ -193,7 +319,7 @@ def main():
                     if mac:
                         stored_tag = tag
                     print("new stored message is : "+ stored_msg )
-                elif behavior == n:
+                elif behavior == 'n':
                     print("keeping " + stored_msg + "stored \n")
                 else:
                     print("please enter y(es) or n(o)")

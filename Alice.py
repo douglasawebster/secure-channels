@@ -139,6 +139,7 @@ def main():
     if enc or mac:
         digital_signature = generate_digital_signature(message_to_sign, alice_private_key)
         set_up_msg = message_to_sign + digital_signature
+        print(len(set_up_msg))
         clientfd.send(set_up_msg)
         
         print("Message For: Bob\n")
